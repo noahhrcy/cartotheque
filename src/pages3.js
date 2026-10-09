@@ -47,7 +47,7 @@ function Listings() {
   let rows = all.filter(l => (!f || norm(cardName(l.c)).includes(norm(f)) || norm(l.c.set.n).includes(norm(f))) && (!max || l.price <= parseFloat(max.replace(',', '.'))));
   rows.sort((a, b) => sort === 'price-asc' ? a.price - b.price : sort === 'deal' ? (a.price / (variantPrice(a.c, a.v) || 1e9)) - (b.price / (variantPrice(b.c, b.v) || 1e9)) : (b.pub.upd || 0) - (a.pub.upd || 0));
   return html`<div class="stack">
-    <div class="row tight"><input id="lst-f" type="search" placeholder="Carte ou extension" value=${f} onInput=${e => setF(e.target.value)} style="flex:1;min-width:160px" /><input id="lst-max" type="text" inputmode="decimal" placeholder="Prix max €" value=${max} onInput=${e => setMax(e.target.value)} style="width:110px" /><select id="lst-sort" aria-label="Tri" value=${sort} onChange=${e => setSort(e.target.value)}><option value="recent">Plus récentes</option><option value="price-asc">Prix croissant</option><option value="deal">Meilleur rapport prix / cote</option></select></div>
+    <div class="row tight"><input autocomplete="off" id="lst-f" type="search" placeholder="Carte ou extension" value=${f} onInput=${e => setF(e.target.value)} style="flex:1;min-width:160px" /><input autocomplete="off" id="lst-max" type="text" inputmode="decimal" placeholder="Prix max €" value=${max} onInput=${e => setMax(e.target.value)} style="width:110px" /><select id="lst-sort" aria-label="Tri" value=${sort} onChange=${e => setSort(e.target.value)}><option value="recent">Plus récentes</option><option value="price-asc">Prix croissant</option><option value="deal">Meilleur rapport prix / cote</option></select></div>
     ${rows.length ? html`<div class="grid-cards">${rows.slice(0, 120).map(l => html`<${CardCell} key=${l.uid + l.c.id} c=${l.c} vi=${l.v} price=${l.price} sub=${`${l.k} · ${langS(l.g)} · ${displayName(l.uid, l.pub)}`} onClick=${() => openModal('listing', { l })} />`)}</div>`
       : html`<${Empty} title="Aucune annonce">${all.length ? 'Aucune annonce ne correspond à ces filtres.' : "Les cartes que les membres mettent en vente apparaîtront ici. Pour vendre les vôtres : fiche de la carte → « Je la vends »."}<//>`}
   </div>`;
@@ -78,7 +78,7 @@ function Members() {
   useEffect(() => { resolveNames(ps.map(p => p.uid)); }, [ps.length]);
   const rows = ps.filter(p => !f || norm(displayName(p.uid, p)).includes(norm(f)) || norm(p.region).includes(norm(f))).sort((a, b) => (b.stats || {}).cards - (a.stats || {}).cards);
   return html`<div class="stack">
-    <input id="mem-f" type="search" placeholder="Rechercher un membre ou une région" value=${f} onInput=${e => setF(e.target.value)} />
+    <input autocomplete="off" id="mem-f" type="search" placeholder="Rechercher un membre ou une région" value=${f} onInput=${e => setF(e.target.value)} />
     ${rows.length ? html`<div class="grid-2">${rows.map(p => html`<button class="match" key=${p.uid} style="cursor:pointer;text-align:left;color:inherit" onClick=${() => go('user', { uid: p.uid })}>
       <${Avatar} uid=${p.uid} />
       <div style="min-width:0"><b>${displayName(p.uid, p)}</b><div class="small muted">${p.region || 'Région non précisée'}</div><div class="tiny muted">${p.colPublic ? `${fmtInt((p.stats || {}).cards)} cartes · ` : ''}${(p.stats || {}).wanted || 0} recherchées · ${(p.stats || {}).trade || 0} à l'échange · ${(p.stats || {}).sell || 0} en vente</div></div>
@@ -121,7 +121,7 @@ function TradePage({ id }) {
       <div class="row tight">
         ${t.status === 'open' && !mine ? html`<button class="btn primary" onClick=${() => { tradeSetStatus(t, 'accepted'); toast('Proposition acceptée'); }}><${Icon} n="check" />Accepter</button><button class="btn" onClick=${() => tradeSetStatus(t, 'refused')}>Refuser</button>` : null}
         ${t.status === 'open' && mine ? html`<button class="btn" onClick=${() => tradeSetStatus(t, 'cancelled')}>Annuler ma proposition</button>` : null}
-        ${t.status === 'accepted' ? html`<input id="trade-price" type="text" inputmode="decimal" placeholder=${t.kind === 'buy' ? 'Prix final (€)' : 'Soulte éventuelle (€)'} value=${price} onInput=${e => setPrice(e.target.value)} style="width:150px" /><button class="btn primary" onClick=${conclude}><${Icon} n="check" />Marquer comme conclu</button>` : null}
+        ${t.status === 'accepted' ? html`<input autocomplete="off" id="trade-price" type="text" inputmode="decimal" placeholder=${t.kind === 'buy' ? 'Prix final (€)' : 'Soulte éventuelle (€)'} value=${price} onInput=${e => setPrice(e.target.value)} style="width:150px" /><button class="btn primary" onClick=${conclude}><${Icon} n="check" />Marquer comme conclu</button>` : null}
         <span class="grow"></span>
         <button class="btn ghost sm" onClick=${() => openModal('report', { target: other, ctx: { trade: t.id } })}><${Icon} n="flag" />Signaler</button>
         <button class="btn ghost sm" onClick=${() => { toggleBlock(other); toast(blocked()[other] ? 'Membre bloqué' : 'Membre débloqué'); if (blocked()[other]) go('market', { tab: 'trades' }); }}><${Icon} n="ban" />${blocked()[other] ? 'Débloquer' : 'Bloquer'}</button>
@@ -131,7 +131,7 @@ function TradePage({ id }) {
     <div class="panel stack">
       <h3>Messages</h3>
       <div class="stack s" ref=${endRef} style="max-height:380px;overflow:auto">${msgs.length ? msgs.map(m => html`<div class=${'thread-msg' + (m.by === S.me.id ? ' mine' : '')}><div>${m.t}</div><div class="tiny muted" style="margin-top:2px">${fmtDT(m.at)}</div></div>`) : html`<p class="small muted">Aucun message.</p>`}</div>
-      ${t.status !== 'cancelled' && t.status !== 'refused' ? html`<form class="row tight" style="flex-wrap:nowrap" onSubmit=${e => { e.preventDefault(); send(); }}><input id="trade-say" type="text" class="grow" maxlength="1000" placeholder="Votre message…" value=${text} onInput=${e => setText(e.target.value)} /><button class="btn primary" type="submit" disabled=${!text.trim()}><${Icon} n="send" />Envoyer</button></form>` : null}
+      ${t.status !== 'cancelled' && t.status !== 'refused' ? html`<form class="row tight" style="flex-wrap:nowrap" onSubmit=${e => { e.preventDefault(); send(); }}><input autocomplete="off" id="trade-say" type="text" class="grow" maxlength="1000" placeholder="Votre message…" value=${text} onInput=${e => setText(e.target.value)} /><button class="btn primary" type="submit" disabled=${!text.trim()}><${Icon} n="send" />Envoyer</button></form>` : null}
       <p class="tiny muted">Ne partagez ni adresse complète ni coordonnées bancaires. Préférez la remise en main propre ou un envoi suivi.</p>
     </div>
   </div>`;
@@ -187,10 +187,10 @@ function ProfilePage() {
     <div class="grid-2">
       <div class="panel stack">
         <h2>Profil public</h2>
-        <label class="field">Pseudo<input id="pf-pseudo" type="text" maxlength="30" placeholder=${S.me.name || 'ex. Rudy'} value=${pseudo} onInput=${e => setPseudo(e.target.value)} /></label>
+        <label class="field">Pseudo<input autocomplete="off" id="pf-pseudo" type="text" maxlength="30" placeholder=${S.me.name || 'ex. Rudy'} value=${pseudo} onInput=${e => setPseudo(e.target.value)} /></label>
         <label class="field">Région (approximative)<select id="pf-region" value=${p.region} onChange=${e => saveProfile({ region: e.target.value })}><option value="">Ne pas indiquer</option>${REGIONS.map(r => html`<option>${r}</option>`)}</select></label>
         <span class="tiny muted">Seule une région est demandée : votre localisation précise n'est jamais collectée ni affichée.</span>
-        <label class="field">Présentation<textarea id="pf-bio" rows="3" maxlength="300" placeholder="Ce que vous collectionnez, vos conditions d'échange…" value=${bio} onInput=${e => setBio(e.target.value)}></textarea></label>
+        <label class="field">Présentation<textarea autocomplete="off" id="pf-bio" rows="3" maxlength="300" placeholder="Ce que vous collectionnez, vos conditions d'échange…" value=${bio} onInput=${e => setBio(e.target.value)}></textarea></label>
         <div class="row" style="justify-content:flex-end"><button class="btn primary" disabled=${!dirty} onClick=${() => { saveProfile({ pseudo: pseudo.trim().slice(0, 30), bio: bio.trim().slice(0, 300) }); toast('Profil enregistré'); }}>Enregistrer</button></div>
       </div>
       <div class="panel stack">
@@ -231,7 +231,7 @@ function AdminCardEditor({ c }) {
   };
   return html`<div class="panel stack s" style="border-style:dashed">
     <div class="spread"><h3>Corriger la fiche (admin)</h3><span class="tiny muted">${o.at ? 'Corrigée le ' + fmtDate(o.at) : 'Valeurs TCGdex'}</span></div>
-    <div class="row tight"><input id="adm-n" type="text" placeholder=${c.n} value=${n} onInput=${e => setN(e.target.value)} /><input id="adm-r" type="text" placeholder=${CAT.meta.rarities[c.r]} value=${r} onInput=${e => setR(e.target.value)} /><input id="adm-note" type="text" placeholder="Motif de la correction" value=${note} onInput=${e => setNote(e.target.value)} style="flex:1;min-width:150px" /><button class="btn sm dark" onClick=${save}>Enregistrer</button></div>
+    <div class="row tight"><input autocomplete="off" id="adm-n" type="text" placeholder=${c.n} value=${n} onInput=${e => setN(e.target.value)} /><input autocomplete="off" id="adm-r" type="text" placeholder=${CAT.meta.rarities[c.r]} value=${r} onInput=${e => setR(e.target.value)} /><input autocomplete="off" id="adm-note" type="text" placeholder="Motif de la correction" value=${note} onInput=${e => setNote(e.target.value)} style="flex:1;min-width:150px" /><button class="btn sm dark" onClick=${save}>Enregistrer</button></div>
   </div>`;
 }
 
@@ -293,7 +293,7 @@ function AdminCatalog() {
   const res = useMemo(() => q.trim().length >= 2 ? searchCards(q).slice(0, 12) : [], [q]);
   const log = Object.values(S.catalogLog).sort((a, b) => b.at - a.at);
   return html`<div class="stack l">
-    <div class="panel stack s"><h3>Corriger une fiche</h3><input id="adm-q" type="search" placeholder="Rechercher la carte à corriger" value=${q} onInput=${e => setQ(e.target.value)} />${res.map(c => html`<div class="stack s" key=${c.id}><span class="small"><b>${cardName(c)}</b> · ${c.set.n} · ${numLabel(c)}</span><${AdminCardEditor} c=${c} /></div>`)}</div>
+    <div class="panel stack s"><h3>Corriger une fiche</h3><input autocomplete="off" id="adm-q" type="search" placeholder="Rechercher la carte à corriger" value=${q} onInput=${e => setQ(e.target.value)} />${res.map(c => html`<div class="stack s" key=${c.id}><span class="small"><b>${cardName(c)}</b> · ${c.set.n} · ${numLabel(c)}</span><${AdminCardEditor} c=${c} /></div>`)}</div>
     <div class="panel stack s"><h3>Historique des modifications</h3>${log.length ? html`<div class="table-wrap"><table class="data"><thead><tr><th>Date</th><th>Carte</th><th>Avant</th><th>Après</th><th>Motif</th></tr></thead><tbody>${log.map(e => html`<tr><td class="num small">${fmtDT(e.at)}</td><td class="small">${e.card}</td><td class="small">${e.before.n} · ${e.before.r}</td><td class="small">${e.after.n} · ${e.after.r}</td><td class="small">${e.note || '—'}</td></tr>`)}</tbody></table></div>` : html`<p class="small muted">Aucune modification. Chaque correction est journalisée ici.</p>`}</div>
     <p class="tiny muted">Ajout d'extensions et de cartes : le catalogue est régénéré depuis TCGdex à chaque mise à jour des données ; les corrections manuelles s'appliquent par-dessus.</p>
   </div>`;
@@ -322,9 +322,9 @@ function AdminSettings() {
     PF.setConfig({ scanQuota: Math.max(1, parseInt(quota, 10) || 20), enforceQuota: enforce, banner: banner.trim().slice(0, 200) }).then(() => toast('Réglages enregistrés')).catch(() => toast("Échec de l'enregistrement"));
   };
   return html`<div class="panel stack" style="max-width:640px">
-    <label class="field">Scans gratuits par mois<input id="adm-quota" type="number" min="1" value=${quota} onInput=${e => setQuota(e.target.value)} style="width:120px" /></label>
+    <label class="field">Scans gratuits par mois<input autocomplete="off" id="adm-quota" type="number" min="1" value=${quota} onInput=${e => setQuota(e.target.value)} style="width:120px" /></label>
     <label class="switch"><input id="adm-enforce" type="checkbox" checked=${enforce} onChange=${e => setEnforce(e.target.checked)} />Appliquer la limite (sinon le compteur est seulement affiché, utile pendant la bêta)</label>
-    <label class="field">Bandeau d'annonce (vide = aucun)<input id="adm-banner" type="text" maxlength="200" placeholder="ex. Bêta ouverte : vos retours sont les bienvenus !" value=${banner} onInput=${e => setBanner(e.target.value)} /></label>
+    <label class="field">Bandeau d'annonce (vide = aucun)<input autocomplete="off" id="adm-banner" type="text" maxlength="200" placeholder="ex. Bêta ouverte : vos retours sont les bienvenus !" value=${banner} onInput=${e => setBanner(e.target.value)} /></label>
     <div class="row" style="justify-content:flex-end"><button class="btn primary" onClick=${save}>Enregistrer</button></div>
   </div>`;
 }

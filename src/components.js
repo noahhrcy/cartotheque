@@ -188,10 +188,10 @@ function AddModal({ id, vi, preset }) {
       <div class="row">
         <label class="field">Langue<select id="add-lang" value=${g} onChange=${e => setG(e.target.value)}>${LANGS.map(l => html`<option value=${l.k}>${l.l}</option>`)}</select></label>
         <div class="field"><span>Quantité</span><${Stepper} value=${q} min=${1} onChange=${setQ} /></div>
-        <label class="field">Prix d'achat unitaire (facultatif)<input id="add-pp" type="text" inputmode="decimal" placeholder="ex. 12,50" value=${pp} onInput=${e => setPp(e.target.value)} style="width:150px" /></label>
+        <label class="field">Prix d'achat unitaire (facultatif)<input autocomplete="off" id="add-pp" type="text" inputmode="decimal" placeholder="ex. 12,50" value=${pp} onInput=${e => setPp(e.target.value)} style="width:150px" /></label>
       </div>
       <label class="switch"><input id="add-graded" type="checkbox" checked=${graded} onChange=${e => setGraded(e.target.checked)} />Carte gradée</label>
-      ${graded ? html`<div class="row"><label class="field">Société<select id="add-gc" value=${gc} onChange=${e => setGc(e.target.value)}>${['PSA', 'PCA', 'CGC', 'BGS', 'CCC', 'Autre'].map(x => html`<option>${x}</option>`)}</select></label><label class="field">Note<input id="add-gg" type="text" value=${gg} onInput=${e => setGg(e.target.value)} style="width:80px" /></label></div>` : null}
+      ${graded ? html`<div class="row"><label class="field">Société<select id="add-gc" value=${gc} onChange=${e => setGc(e.target.value)}>${['PSA', 'PCA', 'CGC', 'BGS', 'CCC', 'Autre'].map(x => html`<option>${x}</option>`)}</select></label><label class="field">Note<input autocomplete="off" id="add-gg" type="text" value=${gg} onInput=${e => setGg(e.target.value)} style="width:80px" /></label></div>` : null}
       ${customBinders.length ? html`<label class="field">Ranger dans un classeur (facultatif)<select id="add-binder" value=${binder} onChange=${e => setBinder(e.target.value)}><option value="">Aucun</option>${customBinders.map(([bid, b]) => html`<option value=${bid}>${b.n}</option>`)}</select></label>` : null}
       <div class="row" style="justify-content:flex-end"><button class="btn ghost" onClick=${closeModal}>Annuler</button><button class="btn primary" onClick=${submit}><${Icon} n="plus" />Ajouter ${q > 1 ? q + ' exemplaires' : ''}</button></div>
     </div>
@@ -204,7 +204,7 @@ function PickerModal({ title, onPick, setIdx }) {
   const res = useMemo(() => q.trim().length >= 2 ? searchCards(q, { setIdx }).slice(0, 30) : (setIdx != null ? CAT.sets[setIdx].cards.slice(0, 30) : []), [q]);
   return html`<${Modal} title=${title || 'Choisir une carte'} wide=${true}>
     <div class="stack">
-      <input id="picker-q" type="search" placeholder="Nom, numéro (125/197) ou code (MEW 6)" value=${q} onInput=${e => setQ(e.target.value)} autofocus />
+      <input autocomplete="off" id="picker-q" type="search" placeholder="Nom, numéro (125/197) ou code (MEW 6)" value=${q} onInput=${e => setQ(e.target.value)} autofocus />
       ${res.length ? html`<div class="grid-cards">${res.map(c => html`<${CardCell} c=${c} onClick=${() => { onPick(c); closeModal(); }} sub=${c.set.n} />`)}</div>` : html`<p class="muted small">Tapez au moins deux caractères.</p>`}
     </div>
   <//>`;
@@ -226,7 +226,7 @@ function CopiesModal({ id, mode }) {
           <td><${Stepper} value=${it.q} min=${1} onChange=${n => updateItem(it, { q: n })} /></td>
           <td><${Stepper} label="À échanger" value=${it.tq || 0} max=${it.q} onChange=${n => updateItem(it, { tq: n })} /></td>
           <td><${Stepper} label="À vendre" value=${it.sq || 0} max=${it.q} onChange=${n => updateItem(it, { sq: n, sp: it.sp || round2(variantPrice(c, it.v) * condF(it.k)) || undefined })} /></td>
-          <td><input aria-label="Prix demandé" type="text" inputmode="decimal" style="width:84px" value=${it.sp ? String(it.sp).replace('.', ',') : ''} placeholder=${fmtEUR(variantPrice(c, it.v) * condF(it.k))} onChange=${e => updateItem(it, { sp: parseFloat(e.target.value.replace(',', '.')) || undefined })} /></td>
+          <td><input autocomplete="off" aria-label="Prix demandé" type="text" inputmode="decimal" style="width:84px" value=${it.sp ? String(it.sp).replace('.', ',') : ''} placeholder=${fmtEUR(variantPrice(c, it.v) * condF(it.k))} onChange=${e => updateItem(it, { sp: parseFloat(e.target.value.replace(',', '.')) || undefined })} /></td>
           <td class="r num">${fmtEUR(itemValue(it))}</td>
           <td><button class="icon-btn" style="width:32px;height:32px" aria-label="Retirer de la collection" onClick=${() => removeItem(it)}><${Icon} n="trash" s=${15} /></button></td>
         </tr>`)}</tbody></table></div>` : html`<${Empty} title="Vous ne possédez pas encore cette carte" action=${html`<button class="btn primary" onClick=${() => openModal('add', { id })}>Ajouter à ma collection</button>`} />`}
@@ -263,7 +263,7 @@ function TradeModal({ to, wantIds, offerIds, kind: kind0 }) {
         <div class="panel flat"><div class="eyebrow" style="margin-bottom:8px">Je propose · ${fmtEUR(giveV)}</div><${List} ids=${mine} sel=${give} fn=${setGive} empty="Marquez des cartes « à échanger » ou gardez des doubles pour pouvoir les proposer." /></div>
       </div>
       ${kind === 'buy' ? html`<p class="notice">Achat direct : prix demandé par le vendeur <b class="num">${fmtEUR(askPrice)}</b>. Le paiement et l'envoi se règlent entre vous ; la plateforme n'intervient pas en V1.</p>` : null}
-      <label class="field">Message<textarea id="trade-msg" rows="3" maxlength="1000" placeholder="Bonjour, je vous propose…" value=${text} onInput=${e => setText(e.target.value)}></textarea></label>
+      <label class="field">Message<textarea autocomplete="off" id="trade-msg" rows="3" maxlength="1000" placeholder="Bonjour, je vous propose…" value=${text} onInput=${e => setText(e.target.value)}></textarea></label>
       <p class="tiny muted">Ne partagez ni adresse ni coordonnées bancaires ici. Les messages restent lisibles par l'équipe de modération.</p>
       <div class="row" style="justify-content:flex-end"><button class="btn ghost" onClick=${closeModal}>Annuler</button><button class="btn primary" disabled=${busy || (!give.size && !get.size)} onClick=${send}><${Icon} n="send" />Envoyer la proposition</button></div>
     </div>
@@ -289,8 +289,8 @@ function BinderModal({ id, set: presetSet }) {
   };
   return html`<${Modal} title=${id ? 'Modifier le classeur' : 'Nouveau classeur'}>
     <div class="stack">
-      <label class="field">Nom<input id="binder-name" type="text" value=${n} placeholder="ex. Master Set Méga-Évolution" onInput=${e => setN(e.target.value)} /></label>
-      <label class="field">Description<input id="binder-desc" type="text" value=${d} placeholder="facultatif" onInput=${e => setD(e.target.value)} /></label>
+      <label class="field">Nom<input autocomplete="off" id="binder-name" type="text" value=${n} placeholder="ex. Master Set Méga-Évolution" onInput=${e => setN(e.target.value)} /></label>
+      <label class="field">Description<input autocomplete="off" id="binder-desc" type="text" value=${d} placeholder="facultatif" onInput=${e => setD(e.target.value)} /></label>
       <div class="field"><span>Contenu</span><${Seg} options=${[{ v: 'set', l: "Une extension complète" }, { v: 'custom', l: 'Libre' }]} value=${kind} onChange=${setKind} /></div>
       ${kind === 'set' ? html`<label class="field">Extension<select id="binder-set" value=${setId} onChange=${e => setSetId(e.target.value)}>${CAT.latestSets.map(s => html`<option value=${s.id}>${s.n} (${(s.d || '').slice(0, 4)})</option>`)}</select></label>` : null}
       <div class="field"><span>Format de page</span><${Seg} options=${['2x2', '3x3', '4x3', '4x4'].map(x => ({ v: x, l: x.replace('x', ' × ') }))} value=${layout} onChange=${setLayout} /></div>
@@ -313,7 +313,7 @@ function ReportModal({ target, ctx }) {
   return html`<${Modal} title="Signaler">
     <div class="stack">
       <p class="small muted">Expliquez ce qui pose problème (arnaque, contenu inapproprié, faux prix…). La modération reçoit votre signalement.</p>
-      <textarea id="report-reason" rows="4" maxlength="500" value=${reason} onInput=${e => setReason(e.target.value)}></textarea>
+      <textarea autocomplete="off" id="report-reason" rows="4" maxlength="500" value=${reason} onInput=${e => setReason(e.target.value)}></textarea>
       <div class="row" style="justify-content:flex-end"><button class="btn ghost" onClick=${closeModal}>Annuler</button><button class="btn primary" disabled=${!reason.trim()} onClick=${() => { report(target, reason, ctx || {}); closeModal(); }}>Envoyer</button></div>
     </div>
   <//>`;

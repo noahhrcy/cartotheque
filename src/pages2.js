@@ -98,7 +98,7 @@ function ScanPage() {
 
     <section class="panel stack s">
       <div class="spread"><h3>Saisie rapide</h3><span class="tiny muted">pour une carte abîmée, mal éclairée ou sans appareil photo</span></div>
-      <input id="scan-quick" type="search" placeholder="Numéro imprimé (125/197), code (MEW 6) ou nom" value=${quick} onInput=${e => setQuick(e.target.value)} />
+      <input autocomplete="off" id="scan-quick" type="search" placeholder="Numéro imprimé (125/197), code (MEW 6) ou nom" value=${quick} onInput=${e => setQuick(e.target.value)} />
       ${quickRes.length ? html`<div class="grid-cards">${quickRes.map(c => html`<${CardCell} c=${c} sub=${c.set.n} onClick=${() => openModal('add', { id: c.id })} />`)}</div>` : null}
     </section>
 
@@ -219,7 +219,7 @@ function ColCards() {
   const setOpts = [...new Set(items.map(it => CAT.byId.get(it.c).si))].map(i => CAT.sets[i]).sort((a, b) => (b.d || '').localeCompare(a.d || ''));
   return html`<div class="stack">
     <div class="row tight">
-      <input id="col-f" type="search" placeholder="Filtrer par nom ou numéro" value=${f} onInput=${e => setF(e.target.value)} style="flex:1;min-width:160px" />
+      <input autocomplete="off" id="col-f" type="search" placeholder="Filtrer par nom ou numéro" value=${f} onInput=${e => setF(e.target.value)} style="flex:1;min-width:160px" />
       <select id="col-set" aria-label="Extension" value=${setIdx} onChange=${e => setSetIdx(e.target.value)}><option value="">Toutes les extensions</option>${setOpts.map(s => html`<option value=${s.i}>${s.n}</option>`)}</select>
       <select id="col-lang" aria-label="Langue" value=${lang} onChange=${e => setLang(e.target.value)}><option value="">Toutes langues</option>${LANGS.map(l => html`<option value=${l.k}>${l.l}</option>`)}</select>
       <select id="col-cond" aria-label="État" value=${cond} onChange=${e => setCond(e.target.value)}><option value="">Tous états</option>${CONDS.map(x => html`<option value=${x.k}>${x.k}</option>`)}</select>
@@ -272,7 +272,7 @@ function ColWish() {
         <td class="r num">${fmtEUR(r.c.p)}</td>
         <td class="r"><${Delta} x=${r.c.d7} /></td>
         <td><select aria-label="Priorité" value=${r.w.p || 2} onChange=${e => setW(r.id, { p: +e.target.value })}><option value="1">Haute</option><option value="2">Normale</option><option value="3">Basse</option></select></td>
-        <td><input aria-label="Prix maximum" type="text" inputmode="decimal" style="width:80px" placeholder="—" value=${r.w.mx ? String(r.w.mx).replace('.', ',') : ''} onChange=${e => setW(r.id, { mx: parseFloat(e.target.value.replace(',', '.')) || 0 })} /></td>
+        <td><input autocomplete="off" aria-label="Prix maximum" type="text" inputmode="decimal" style="width:80px" placeholder="—" value=${r.w.mx ? String(r.w.mx).replace('.', ',') : ''} onChange=${e => setW(r.id, { mx: parseFloat(e.target.value.replace(',', '.')) || 0 })} /></td>
         <td class="r">${r.avail ? html`<button class="chip pill-own" onClick=${() => go('card', { id: r.id })}>${r.avail} membre${r.avail > 1 ? 's' : ''}</button>` : html`<span class="muted">—</span>`}</td>
         <td><button class="icon-btn" style="width:30px;height:30px" aria-label="Retirer" onClick=${() => toggleWish(r.id)}><${Icon} n="x" s=${14} /></button></td>
       </tr>`)}
@@ -309,12 +309,12 @@ function ColSealed() {
       <div class="row tight">
         <select id="sealed-type" aria-label="Type" value=${type} onChange=${e => setType(e.target.value)}>${SEALED_TYPES.map(t => html`<option>${t}</option>`)}</select>
         <select id="sealed-set" aria-label="Extension" value=${setId} onChange=${e => setSetId(e.target.value)}>${CAT.latestSets.map(s => html`<option value=${s.id}>${s.n}</option>`)}</select>
-        <input id="sealed-name" type="text" placeholder="Précision (ex. édition Pokémon Center)" value=${name} onInput=${e => setName(e.target.value)} style="flex:1;min-width:160px" />
+        <input autocomplete="off" id="sealed-name" type="text" placeholder="Précision (ex. édition Pokémon Center)" value=${name} onInput=${e => setName(e.target.value)} style="flex:1;min-width:160px" />
       </div>
       <div class="row tight">
         <${Stepper} value=${q} min=${1} onChange=${setQ} />
-        <input id="sealed-pp" type="text" inputmode="decimal" placeholder="Prix d'achat unitaire" value=${pp} onInput=${e => setPp(e.target.value)} style="width:170px" />
-        <input id="sealed-est" type="text" inputmode="decimal" placeholder="Valeur estimée unitaire" value=${est} onInput=${e => setEst(e.target.value)} style="width:170px" />
+        <input autocomplete="off" id="sealed-pp" type="text" inputmode="decimal" placeholder="Prix d'achat unitaire" value=${pp} onInput=${e => setPp(e.target.value)} style="width:170px" />
+        <input autocomplete="off" id="sealed-est" type="text" inputmode="decimal" placeholder="Valeur estimée unitaire" value=${est} onInput=${e => setEst(e.target.value)} style="width:170px" />
         <button class="btn primary" onClick=${() => { saveSealed(newId(), { type, set: setId, name: name.trim(), q, pp: num(pp), est: num(est), at: Date.now() }); setName(''); setPp(''); setEst(''); setQ(1); toast('Produit ajouté'); }}><${Icon} n="plus" />Ajouter</button>
       </div>
       <p class="tiny muted">La cote des produits scellés n'est pas encore fournie par nos sources : indiquez votre estimation, elle sera remplacée par une cote marché dès qu'un fournisseur sera branché.</p>

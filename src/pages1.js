@@ -25,7 +25,7 @@ function TopBar() {
       ${isAdmin() ? html`<button aria-current=${section() === 'admin' ? 'page' : null} onClick=${() => go('admin')}>Admin</button>` : null}
     </nav>
     <form class="top-search" onSubmit=${e => { e.preventDefault(); if (q.trim()) go('cards', { q: q.trim() }); }}>
-      <input id="top-q" type="search" placeholder="Rechercher une carte…" value=${q} onInput=${e => setQ(e.target.value)} aria-label="Rechercher une carte" />
+      <input autocomplete="off" id="top-q" type="search" placeholder="Rechercher une carte…" value=${q} onInput=${e => setQ(e.target.value)} aria-label="Rechercher une carte" />
     </form>
     <div class="top-actions" style="margin-left:auto">
       ${S.mode === 'local' ? html`<span class="chip" title="Vos données sont enregistrées sur cet appareil uniquement">${PF.text.chip}</span>` : null}
@@ -84,7 +84,7 @@ function HomePage() {
       <div class="panel stack">
         <form class="stack s" onSubmit=${e => { e.preventDefault(); go('cards', { q: q.trim() }); }}>
           <label class="eyebrow" for="home-q">Rechercher une carte</label>
-          <div class="row tight" style="flex-wrap:nowrap"><input id="home-q" class="grow" type="search" placeholder="Dracaufeu, 125/197, MEW 6…" value=${q} onInput=${e => setQ(e.target.value)} /><button class="btn dark" type="submit">Chercher</button></div>
+          <div class="row tight" style="flex-wrap:nowrap"><input autocomplete="off" id="home-q" class="grow" type="search" placeholder="Dracaufeu, 125/197, MEW 6…" value=${q} onInput=${e => setQ(e.target.value)} /><button class="btn dark" type="submit">Chercher</button></div>
           <p class="tiny muted">${fmtInt(CAT.meta.cards)} cartes · ${CAT.meta.sets} extensions françaises, de 1999 à aujourd'hui</p>
         </form>
         ${wishAvail ? html`<button class="notice" style="border:0;text-align:left;cursor:pointer" onClick=${() => go('market', { tab: 'matches' })}><b>${wishAvail === 1 ? '1 carte' : wishAvail + ' cartes'} de votre wishlist ${wishAvail === 1 ? 'est disponible' : 'sont disponibles'}</b> chez des membres. Voir les correspondances →</button>` : null}
@@ -147,7 +147,7 @@ function CardsPage({ q: q0, serie: serie0 }) {
   return html`<div class="stack">
     <div class="spread"><h1>Toutes les cartes</h1><span class="small muted">${fmtInt(CAT.meta.cards)} cartes référencées</span></div>
     <div class="panel stack s">
-      <input id="cards-q" type="search" placeholder="Nom de la carte, numéro (125/197) ou code d'extension (MEW 6)" value=${q} onInput=${e => setQ(e.target.value)} autofocus />
+      <input autocomplete="off" id="cards-q" type="search" placeholder="Nom de la carte, numéro (125/197) ou code d'extension (MEW 6)" value=${q} onInput=${e => setQ(e.target.value)} autofocus />
       <div class="row tight">
         <select id="f-serie" aria-label="Série" value=${serie} onChange=${e => { setSerie(e.target.value); setSetIdx(''); }}><option value="">Toutes les séries</option>${[...CAT.series].reverse().map(s => html`<option value=${s.id}>${s.n}</option>`)}</select>
         <select id="f-set" aria-label="Extension" value=${setIdx} onChange=${e => setSetIdx(e.target.value)}><option value="">Toutes les extensions</option>${setsOfSerie.map(s => html`<option value=${s.i}>${s.n}</option>`)}</select>
@@ -173,7 +173,7 @@ function SetsPage() {
   const [f, setF] = useState('');
   const groups = [...CAT.series].reverse().map(se => ({ se, sets: CAT.latestSets.filter(s => s.s === se.id && (!f || norm(s.n).includes(norm(f)) || norm(s.a) === norm(f))) })).filter(g => g.sets.length);
   return html`<div class="stack l">
-    <div class="spread"><h1>Extensions</h1><input id="sets-f" type="search" placeholder="Filtrer les extensions" value=${f} onInput=${e => setF(e.target.value)} style="max-width:260px" /></div>
+    <div class="spread"><h1>Extensions</h1><input autocomplete="off" id="sets-f" type="search" placeholder="Filtrer les extensions" value=${f} onInput=${e => setF(e.target.value)} style="max-width:260px" /></div>
     ${groups.map(g => html`<section key=${g.se.id}><div class="section-h"><h2>${g.se.n}</h2><span class="tiny muted">${plural(g.sets.length, 'extension')}</span></div><div class="grid-2">${g.sets.map(s => html`<${SetRow} s=${s} />`)}</div></section>`)}
   </div>`;
 }
