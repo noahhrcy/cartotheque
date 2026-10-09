@@ -1,0 +1,14 @@
+{
+  "name": "cartotheque-android",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Coque Android de Cartothèque (Capacitor) — charge l'application en ligne",
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/filesystem": "^7.0.0",
+    "@capacitor/share": "^7.0.0"
+  }
+}

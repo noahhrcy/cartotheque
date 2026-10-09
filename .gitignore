@@ -1,0 +1,9 @@
+raw/
+build/
+public/index.html
+public/sw.js
+public/manifest.webmanifest
+mobile/node_modules/
+mobile/android/
+__pycache__/
+*.pyc

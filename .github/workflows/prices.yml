@@ -1,0 +1,32 @@
+name: Mise à jour des prix
+on:
+  schedule:
+    - cron: "40 10 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: prices
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Télécharger le catalogue et les prix (TCGdex)
+        run: python scripts/fetch_tcgdex.py raw
+      - name: Construire les données
+        run: |
+          python scripts/build_data.py raw public
+          python scripts/update_history.py public
+      - name: Enregistrer
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data
+          if git diff --cached --quiet; then echo "Aucun changement"; exit 0; fi
+          git commit -m "Prix du $(date -u +%F)"
+          git push

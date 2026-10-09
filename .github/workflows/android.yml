@@ -1,0 +1,51 @@
+name: Application Android
+on:
+  push:
+    branches: [main]
+    paths: ["mobile/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Garder la même signature d'une version à l'autre
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: cartotheque-debug-keystore
+      - name: Préparer le projet Android
+        working-directory: mobile
+        run: |
+          npm install --no-audit --no-fund
+          npx cap add android
+          cp -r res/* android/app/src/main/res/
+          find android/app/src/main/res -name splash.png -exec cp splash.png {} \;
+          if [ -f android/app/src/main/res/values/ic_launcher_background.xml ]; then
+            sed -i 's/#FFFFFF/#12151B/I' android/app/src/main/res/values/ic_launcher_background.xml
+          fi
+          sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.CAMERA" />#' android/app/src/main/AndroidManifest.xml
+          grep -q "android.permission.CAMERA" android/app/src/main/AndroidManifest.xml
+          npx cap sync android
+      - name: Compiler l'APK
+        working-directory: mobile/android
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Publier la version bêta
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk Cartotheque-beta.apk
+          gh release delete beta --yes --cleanup-tag || true
+          gh release create beta Cartotheque-beta.apk --target "${GITHUB_SHA}" --prerelease \
+            --title "Cartothèque — bêta Android" \
+            --notes "Version de test. Sur le téléphone : ouvrez ce lien, téléchargez Cartotheque-beta.apk, puis autorisez l'installation depuis votre navigateur quand Android le demande. L'application charge toujours la dernière version du site : il n'est pas nécessaire de la réinstaller à chaque mise à jour."
