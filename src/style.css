@@ -173,7 +173,7 @@ main { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding-inline: 
 .stack.s { gap: 8px; }
 .stack.l { gap: 26px; }
 .grow { flex: 1; min-width: 0; }
-input[type="text"], input[type="search"], input[type="number"], select, textarea {
+input[type="text"], input[type="search"], input[type="number"], input[type="email"], input[type="password"], select, textarea {
   background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-1); padding: 8px 11px; min-width: 0;
 }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
