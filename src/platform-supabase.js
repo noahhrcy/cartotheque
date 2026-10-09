@@ -273,8 +273,8 @@ function AuthForm({ compact }) {
   };
   return html`<form class="stack" novalidate onSubmit=${submit}>
     <${Seg} label="Compte" options=${[{ v: 'signup', l: 'Créer un compte' }, { v: 'login', l: 'Se connecter' }]} value=${mode} onChange=${m => { setMode(m); setMsg(''); }} />
-    ${mode === 'signup' ? html`<label class="field">Pseudo<input id="auth-pseudo" name="cartotheque-pseudo" type="text" maxlength="30" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" placeholder="ex. Rudy" value=${pseudo} onInput=${e => setPseudo(e.target.value)} /></label>` : null}
-    <label class="field">E-mail<input id="auth-email" name="email" type="email" autocomplete="username" autocapitalize="off" spellcheck="false" inputmode="email" value=${email} onInput=${e => setEmail(e.target.value)} /></label>
+    ${mode === 'signup' ? html`<label class="field">Pseudo<input id="auth-pseudo" name="cartotheque-pseudo" type="text" maxlength="30" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck=${false} data-lpignore="true" data-1p-ignore="true" data-bwignore="true" placeholder="ex. Rudy" value=${pseudo} onInput=${e => setPseudo(e.target.value)} /></label>` : null}
+    <label class="field">E-mail<input id="auth-email" name="email" type="email" autocomplete="username" autocapitalize="off" spellcheck=${false} inputmode="email" value=${email} onInput=${e => setEmail(e.target.value)} /></label>
     <label class="field">Mot de passe<input id="auth-pw" name="password" type="password" autocomplete=${mode === 'signup' ? 'new-password' : 'current-password'} value=${pw} onInput=${e => setPw(e.target.value)} /></label>
     ${msg ? html`<p class="notice small" role="alert">${msg}</p>` : null}
     <button class="btn primary" type="submit" disabled=${busy}>${busy ? 'Un instant…' : mode === 'signup' ? 'Créer mon compte' : 'Me connecter'}</button>
