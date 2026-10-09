@@ -171,18 +171,30 @@ function variantPrice(card, vi) { const v = card.v[vi == null ? card.mv : vi] ||
 function itemValue(it) { const c = CAT.byId.get(it.c); if (!c) return 0; return variantPrice(c, it.v) * condF(it.k) * (it.q || 1); }
 
 // ---------- search ----------
-function searchCards(q, f = {}) {
+// A word is first looked up in card names. It only becomes an extension filter when it comes with a
+// card number ("MEW 6") or when no card name contains it ("OBF", "dracaufeu obsidiennes", "dracaufeu 151").
+const STOPWORDS = new Set(['et', 'de', 'des', 'du', 'la', 'le', 'les', 'l', 'd', 'en', 'a', 'au', 'aux', 'the', 'of', 'and']);
+const setsNamed = n => new Set(CAT.sets.filter(s => s.cards.length && norm(s.n) === norm(n)).map(s => s.i));
+function parseQuery(q) {
   q = String(q || '').trim();
-  let nameTokens = [], number = null, total = null, codeTokens = [];
+  let number = null, total = null, rest = q, setNum = null;
   const m = q.match(/([a-z]*\d+[a-z]*)\s*\/\s*([a-z]*\d+)/i);
-  let rest = q;
   if (m) { number = normLid(m[1]); total = parseInt(m[2].replace(/\D/g, ''), 10) || null; rest = q.replace(m[0], ' '); }
+  const toks = [], nums = [];
   for (const w of words(rest)) {
-    if (/\d/.test(w) && !number && w.length <= 6) number = normLid(w);
-    else if (/^[a-z]{2,4}$/.test(w) && CAT.sets.some(s => norm(s.a) === w || norm(s.al) === w)) codeTokens.push(w);
-    else nameTokens.push(norm(w));
+    if (/\d/.test(w) && w.length <= 6) nums.push(normLid(w));
+    else { const t = norm(w); if (t && !STOPWORDS.has(t)) toks.push(t); }
   }
+  // two numbers, one of them an extension name: "151 6" is card 6 of the extension 151
+  if (nums.length >= 2 || (number && nums.length)) setNum = nums.find(n => setsNamed(n).size) || null;
+  if (!number) number = nums.find(n => n !== setNum) || (setNum ? null : nums[0]) || null;
+  return { number, total, toks, setNum };
+}
+const isSetCode = t => /^[a-z0-9]{2,5}$/.test(t) && CAT.sets.some(s => norm(s.a) === t || norm(s.al) === t);
+const setsMatching = toks => new Set(CAT.sets.filter(s => s.cards.length && toks.every(t => norm(s.a) === t || norm(s.al) === t || norm(s.n).includes(t))).map(s => s.i));
+function runSearch(f, names, sets, number, total) {
   const pool = f.setIdx != null ? CAT.sets[f.setIdx].cards : CAT.cards;
+  const joined = names.join('');
   const out = [];
   for (const c of pool) {
     if (f.cat != null && f.cat !== '' && c.cat !== +f.cat) continue;
@@ -190,16 +202,20 @@ function searchCards(q, f = {}) {
     if (f.rarity != null && f.rarity !== '' && c.r !== +f.rarity) continue;
     if (f.minPrice && c.p < f.minPrice) continue;
     if (f.serie && c.set.s !== f.serie) continue;
+    if (sets && !sets.has(c.si)) continue;
     if (number && normLid(c.lid) !== number) continue;
     if (total && c.set.o !== total && c.set.t !== total) continue;
-    if (codeTokens.length && !codeTokens.some(t => norm(c.set.a) === t || norm(c.set.al) === t)) continue;
     let score = 0;
-    if (nameTokens.length) {
+    if (names.length) {
       const nn = S.overrides[c.id] ? norm(cardName(c)) : c.nn;
       let ok = true;
-      for (const t of nameTokens) { const i = nn.indexOf(t); if (i < 0) { ok = false; break; } score += i === 0 ? 3 : 1; }
+      for (const t of names) {
+        const i = nn.indexOf(t);
+        if (i < 0) { ok = false; break; }
+        score += i === 0 ? 3 + 2 * t.length / nn.length : 1;
+      }
       if (!ok) continue;
-      if (nn === nameTokens.join('')) score += 5;
+      if (nn === joined) score += 6;
     }
     out.push({ c, score });
   }
@@ -212,6 +228,30 @@ function searchCards(q, f = {}) {
     return b.score - a.score || (b.c.set.d || '').localeCompare(a.c.set.d || '') || a.c.k - b.c.k;
   });
   return out.map(o => o.c);
+}
+function searchCards(q, f = {}) {
+  const { number, total, toks, setNum } = parseQuery(q);
+  const codes = toks.filter(isSetCode);
+  const others = toks.filter(t => !codes.includes(t));
+  const tries = [];
+  if (setNum) tries.push({ names: toks, sets: setsNamed(setNum), number });
+  if (number && codes.length) tries.push({ names: others, sets: setsMatching(codes), number });
+  tries.push({ names: toks, sets: null, number });
+  if (codes.length) tries.push({ names: others, sets: setsMatching(codes), number });
+  if (toks.length) tries.push({ names: [], sets: setsMatching(toks), number });   // the whole query names an extension
+  const orphans = toks.filter(t => !CAT.cards.some(c => c.nn.includes(t)));
+  if (orphans.length) tries.push({ names: toks.filter(t => !orphans.includes(t)), sets: setsMatching(orphans), number });
+  if (number && !total && setsNamed(number).size) {
+    // "151" alone is the extension 151; with other words it is tried as a card number first
+    if (toks.length) tries.push({ names: toks, sets: setsNamed(number), number: null });
+    else tries.unshift({ names: [], sets: setsNamed(number), number: null });
+  }
+  for (const t of tries) {
+    if (t.sets && !t.sets.size) continue;
+    const res = runSearch(f, t.names, t.sets, t.number, total);
+    if (res.length) return res;
+  }
+  return [];
 }
 
 // ---------- scanner: match Claude's reading against the catalogue ----------
