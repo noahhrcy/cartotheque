@@ -39,6 +39,10 @@ if TARGET == "artifact":
     sys.exit(0)
 
 # ---------- web / PWA ----------
+cfg_path = os.path.join(OUT, "config.js")
+if not os.path.exists(cfg_path):
+    open(cfg_path, "w", encoding="utf-8").write("window.CARTO_CONFIG = { supabaseUrl: '', supabaseKey: '' };\n")
+cfg_version = hashlib.sha1(open(cfg_path, "rb").read()).hexdigest()[:8]
 base_css = """html{-webkit-text-size-adjust:100%}
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0}
@@ -69,7 +73,7 @@ page = f"""<!doctype html>
 <div id="root"></div>
 <script src="{PREACT}"></script>
 <script src="{SUPABASE}"></script>
-<script src="config.js"></script>
+<script src="config.js?v={cfg_version}"></script>
 <script>
 {js}
 </script>
@@ -116,7 +120,7 @@ self.addEventListener('activate', e => {
 async function staleWhileRevalidate(cacheName, req) {
   const cache = await caches.open(cacheName);
   const hit = await cache.match(req);
-  const fresh = fetch(req).then(res => { if (res && res.ok) cache.put(req, res.clone()); return res; }).catch(() => null);
+  const fresh = fetch(req, { cache: 'no-cache' }).then(res => { if (res && res.ok) cache.put(req, res.clone()); return res; }).catch(() => null);
   return hit || (await fresh) || new Response('', { status: 504 });
 }
 async function cacheFirst(cacheName, req) {
@@ -129,7 +133,7 @@ async function cacheFirst(cacheName, req) {
 }
 async function networkFirst(req) {
   const cache = await caches.open(SHELL);
-  try { const res = await fetch(req); if (res && res.ok) cache.put(req, res.clone()); return res; }
+  try { const res = await fetch(req, { cache: 'no-cache' }); if (res && res.ok) cache.put(req, res.clone()); return res; }
   catch (e) { return (await cache.match(req)) || (await cache.match('index.html')); }
 }
 self.addEventListener('fetch', e => {
@@ -148,8 +152,4 @@ self.addEventListener('fetch', e => {
 });
 """.replace("__VERSION__", version)
 open(os.path.join(OUT, "sw.js"), "w", encoding="utf-8").write(sw)
-
-cfg_path = os.path.join(OUT, "config.js")
-if not os.path.exists(cfg_path):
-    open(cfg_path, "w", encoding="utf-8").write("window.CARTO_CONFIG = { supabaseUrl: '', supabaseKey: '' };\n")
 print("web index.html", len(page.encode("utf-8")), "sw", version)
