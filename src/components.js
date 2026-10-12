@@ -60,11 +60,18 @@ const tileClass = c => c.cat === 1 ? 't-tr' : c.t >= 0 ? 't-' + c.t : (c.cat ===
 const finishClass = (c, vi) => { const l = norm((c.v[vi == null ? c.mv : vi] || c.v[c.mv]).l); return l.startsWith('holo') ? 'holo' : l.startsWith('reverse') ? 'reverse' : ''; };
 
 const BAD_IMG = new Set();
+const SHOWN_IMG = new Set();   // already decoded once: no fade on the next display
 function CardTile({ c, vi, hq }) {
   const url = USE_IMAGES ? imgUrl(c, hq ? 'high' : 'low') : null;
   const [, setBad] = useState(0);
   if (url && !BAD_IMG.has(url)) {
-    return html`<div class=${`tile photo ${finishClass(c, vi)}`}><img src=${url} alt=${`${cardName(c)}, ${c.set.n}, ${numLabel(c)}`} loading="lazy" decoding="async" onError=${() => { BAD_IMG.add(url); setBad(x => x + 1); }} /></div>`;
+    // card page: the small image (usually cached by the list) shows at once, the large one fades in over it
+    const lq = hq ? imgUrl(c, 'low') : null;
+    return html`<div class=${`tile photo ${finishClass(c, vi)}`}>
+      ${lq && !BAD_IMG.has(lq) ? html`<img class="lq" src=${lq} alt="" aria-hidden="true" decoding="async" />` : null}
+      <img class=${SHOWN_IMG.has(url) ? 'in' : ''} src=${url} alt=${`${cardName(c)}, ${c.set.n}, ${numLabel(c)}`} loading=${hq ? 'eager' : 'lazy'} fetchpriority=${hq ? 'high' : null} decoding="async"
+        onLoad=${e => { SHOWN_IMG.add(url); e.currentTarget.classList.add('in'); }} onError=${() => { BAD_IMG.add(url); setBad(x => x + 1); }} />
+    </div>`;
   }
   const rm = rarityMark(rarityName(c));
   return html`<div class=${`tile ${tileClass(c)} ${finishClass(c, vi)}`} aria-label=${`${cardName(c)}, ${c.set.n}, ${numLabel(c)}`}>
@@ -93,7 +100,7 @@ function Pips({ id }) {
 
 function CardCell({ c, vi, sub, price, missing, onClick }) {
   const p = price != null ? price : (vi != null ? variantPrice(c, vi) : c.p);
-  return html`<button class="ccell" onClick=${onClick || (() => go('card', { id: c.id }))}>
+  return html`<button class="ccell" data-cid=${c.id} onClick=${onClick || (e => openCard(c.id, e.currentTarget.querySelector('.tile')))}>
     <div class=${'tile-wrap' + (missing ? ' missing' : '')}><${CardTile} c=${c} vi=${vi} /><${Pips} id=${c.id} /></div>
     <div class="meta"><span class="nm">${cardName(c)}</span><span class="pr">${fmtEUR(p)}</span></div>
     ${sub ? html`<div class="tiny muted" style="margin-top:-4px">${sub}</div>` : null}
@@ -102,6 +109,73 @@ function CardCell({ c, vi, sub, price, missing, onClick }) {
 
 function MiniTile({ c, vi, w }) {
   return html`<div style=${`width:${w || 44}px;flex:none`}><${CardTile} c=${c} vi=${vi} /></div>`;
+}
+
+// state that survives « Retour »: kept on the history entry of the page (filters, tabs, number of results shown)
+function useRouteState(key, init) {
+  const ui = useMemo(() => S.route.ui || (S.route.ui = {}), []);
+  const [v, setV] = useState(key in ui ? ui[key] : init);
+  const set = x => setV(prev => { const nv = typeof x === 'function' ? x(prev) : x; ui[key] = nv; return nv; });
+  return [v, set];
+}
+
+// a number that rolls to its new value (collection value on the home page)
+const COUNT_MEM = new Map();
+function CountUp({ id, value, format }) {
+  const start = COUNT_MEM.has(id) ? COUNT_MEM.get(id) : (reduceMotion() ? value : 0);
+  const [x, setX] = useState(start);
+  useEffect(() => {
+    const from = COUNT_MEM.has(id) ? COUNT_MEM.get(id) : start;
+    COUNT_MEM.set(id, value);
+    if (from === value || reduceMotion()) { setX(value); return; }
+    let raf = 0, t0 = 0;
+    const step = t => { t0 = t0 || t; const k = Math.min(1, (t - t0) / 750); setX(from + (value - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) raf = requestAnimationFrame(step); };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return (format || fmtEUR)(x);
+}
+
+// card visual that leans towards the pointer (or the phone's tilt) with a moving light reflection
+function Tilt({ children }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || reduceMotion()) return;
+    let raf = 0;
+    const apply = (px, py, live) => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        el.style.setProperty('--rx', ((0.5 - py) * 16).toFixed(2) + 'deg');
+        el.style.setProperty('--ry', ((px - 0.5) * 20).toFixed(2) + 'deg');
+        el.style.setProperty('--mx', (px * 100).toFixed(1) + '%');
+        el.style.setProperty('--my', (py * 100).toFixed(1) + '%');
+        el.classList.toggle('tilting', live);
+      });
+    };
+    const move = e => { const r = el.getBoundingClientRect(); apply(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)), true); };
+    const leave = () => apply(0.5, 0.5, false);
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerleave', leave);
+    el.addEventListener('pointercancel', leave);
+    // phones: follow the device tilt (no permission needed on Android; iOS asks for one, so it is left out there)
+    let base = null;
+    const orient = e => {
+      if (e.beta == null || e.gamma == null) return;
+      if (!base) base = { b: e.beta, g: e.gamma };
+      const px = 0.5 + Math.max(-0.5, Math.min(0.5, (e.gamma - base.g) / 50));
+      const py = 0.5 + Math.max(-0.5, Math.min(0.5, (e.beta - base.b) / 50));
+      apply(px, py, true);
+    };
+    const touch = matchMedia('(pointer: coarse)').matches && typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission !== 'function';
+    if (touch) window.addEventListener('deviceorientation', orient);
+    return () => {
+      cancelAnimationFrame(raf);
+      el.removeEventListener('pointermove', move); el.removeEventListener('pointerleave', leave); el.removeEventListener('pointercancel', leave);
+      if (touch) window.removeEventListener('deviceorientation', orient);
+    };
+  }, []);
+  return html`<div class="tilt" ref=${ref}><div class="tilt-in">${children}<span class="glare" aria-hidden="true"></span></div></div>`;
 }
 
 function Delta({ x }) {
@@ -143,17 +217,47 @@ function Seg({ options, value, onChange, label }) {
 }
 
 // ---------- modal host ----------
-function openModal(type, props = {}) { S.modal = { type, props }; emit(); }
-function closeModal() { S.modal = null; emit(); }
+let modalTimer = 0;
+function openModal(type, props = {}) { clearTimeout(modalTimer); S.modal = { type, props }; S.modalClosing = false; emit(); }
+function closeModal() {
+  const m = S.modal;
+  if (!m || S.modalClosing) return;
+  if (reduceMotion() || m.type === 'camera') { S.modal = null; emit(); return; }
+  // let the sheet slide out before removing it; a modal opened meanwhile is left alone
+  S.modalClosing = true; emit();
+  clearTimeout(modalTimer);
+  modalTimer = setTimeout(() => { if (S.modal === m) { S.modal = null; S.modalClosing = false; emit(); } }, 180);
+}
 function Modal({ title, children, wide }) {
+  const box = useRef(null);
   useEffect(() => {
     const k = e => { if (e.key === 'Escape') closeModal(); };
     window.addEventListener('keydown', k);
-    return () => window.removeEventListener('keydown', k);
+    document.documentElement.classList.add('modal-open');
+    return () => { window.removeEventListener('keydown', k); document.documentElement.classList.remove('modal-open'); };
   }, []);
-  return html`<div class="modal-scrim" onClick=${e => { if (e.target === e.currentTarget) closeModal(); }}>
-    <div class=${'modal' + (wide ? ' wide' : '')} role="dialog" aria-modal="true" aria-label=${title}>
-      <div class="spread" style="margin-bottom:14px"><h2>${title}</h2><button class="icon-btn" aria-label="Fermer" onClick=${closeModal}><${Icon} n="x" /></button></div>
+  // phones: drag the sheet down by its header to close it
+  const drag = useRef(null);
+  const down = e => {
+    if (!matchMedia('(max-width: 699px)').matches || e.target.closest('button')) return;
+    drag.current = { y: e.clientY, dy: 0, id: e.pointerId };
+    box.current.style.transition = 'none';
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* pointer already released */ }
+  };
+  const moveD = e => {
+    const d = drag.current; if (!d || d.id !== e.pointerId) return;
+    d.dy = Math.max(0, e.clientY - d.y);
+    box.current.style.transform = `translateY(${d.dy}px)`;
+  };
+  const up = e => {
+    const d = drag.current; if (!d || d.id !== e.pointerId) return;
+    drag.current = null;
+    box.current.style.transition = '';
+    if (d.dy > 90) { box.current.style.transform = `translateY(${d.dy}px)`; closeModal(); } else box.current.style.transform = '';
+  };
+  return html`<div class=${'modal-scrim' + (S.modalClosing ? ' closing' : '')} onClick=${e => { if (e.target === e.currentTarget) closeModal(); }}>
+    <div ref=${box} class=${'modal' + (wide ? ' wide' : '')} role="dialog" aria-modal="true" aria-label=${title}>
+      <div class="modal-head" onPointerDown=${down} onPointerMove=${moveD} onPointerUp=${up} onPointerCancel=${up}><h2>${title}</h2><button class="icon-btn" aria-label="Fermer" onClick=${closeModal}><${Icon} n="x" /></button></div>
       ${children}
     </div>
   </div>`;
@@ -178,6 +282,7 @@ function AddModal({ id, vi, preset }) {
     if (binder) { const b = binderList()[binder]; if (b) saveBinder(binder, { ...b, slots: [...(b.slots || []), id] }); }
     if (inWish(id)) toggleWish(id);
     closeModal();
+    haptic('success');
     toast(`${cardName(c)} ajoutée à votre collection`);
   };
   return html`<${Modal} title="Ajouter à ma collection">

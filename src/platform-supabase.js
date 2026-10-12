@@ -106,7 +106,18 @@ const PF = {
   async toggleBan(uid, on) { const { error } = await sb.rpc('admin_moderate', { p_user: uid, p_action: on ? 'ban' : 'unban' }); sbFail(error); await loadPubs(); },
   async handleReport(r) { const { error } = await sb.from('reports').update({ handled_at: new Date().toISOString() }).eq('id', r.rid); sbFail(error); await loadReports(); },
   async hideListings(uid) { const { error } = await sb.rpc('admin_moderate', { p_user: uid, p_action: 'hide_listings' }); sbFail(error); await loadPubs(); },
-  onNavigate() { try { history.pushState({ d: S.hist.length }, ''); } catch (e) { /* history unavailable */ } },
+  onNavigate() { try { history.pushState({ d: S.hist.length }, '', routeHash(S.route) || location.pathname + location.search); } catch (e) { /* history unavailable */ } },
+  historyBack() { history.back(); },
+  // share a page of the site: system share sheet on phones (native in the apps), copied link elsewhere
+  async shareLink(title, hash) {
+    const url = location.origin + location.pathname + hash;
+    const cap = window.Capacitor;
+    try {
+      if (isNative() && cap.Plugins && cap.Plugins.Share) { await cap.Plugins.Share.share({ title, text: title, url }); return; }
+      if (navigator.share) { await navigator.share({ title, url }); return; }
+    } catch (e) { if (e && (e.name === 'AbortError' || /cancel/i.test(e.message || ''))) return; }
+    try { await navigator.clipboard.writeText(url); toast('Lien copié'); } catch (e) { toast(url); }
+  },
 };
 
 // ---------- loaders ----------
@@ -218,9 +229,18 @@ async function startCloud(user) {
 }
 
 async function initPlatform() {
-  window.addEventListener('popstate', () => {
+  window.addEventListener('popstate', e => {
     if (S.modal) { closeModal(); PF.onNavigate(); return; }
-    if (S.hist.length) back();
+    const top = S.hist[S.hist.length - 1];
+    // browser back to the page we came from: restore it (scroll, filters); otherwise (forward, history from before a reload) follow the address
+    const nav = top && routeHash(top) === (location.hash || '') ? back : () => { S.route = routeFromHash(location.hash) || { name: 'home', params: {} }; S.navDir = 'back'; emit(); };
+    // Safari and Chrome already animate their swipe-back gesture
+    if (e.hasUAVisualTransition) nav(); else withTransition(nav);
+  });
+  // keep the address bar on the current page when the route changes without a navigation (sign-in, deletions…)
+  listeners.add(() => {
+    const h = routeHash(S.route);
+    if ((location.hash || '') !== h) { try { history.replaceState(history.state, '', h || location.pathname + location.search); } catch (e) { /* history unavailable */ } }
   });
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); S.installPrompt = e; emit(); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.mode === 'cloud') { loadPubs(); loadTrades(); } });
@@ -244,7 +264,8 @@ async function initPlatform() {
   if (data && data.session) await startCloud(data.session.user);
   else {
     startLocal();
-    if (!lsGet('welcomed', false)) { S.route = { name: 'auth', params: {} }; emit(); }
+    // first visit on the home page: welcome screen; a shared link opens its page directly
+    if (!lsGet('welcomed', false) && S.route.name === 'home') { S.route = { name: 'auth', params: {} }; emit(); }
   }
 }
 
@@ -323,6 +344,25 @@ function AccountPanel() {
 PF.LoginButton = LoginButton;
 PF.AccountPanel = AccountPanel;
 
+// ---------- install invitation (Android: install prompt; iPhone: Safari has no prompt, so explain the share menu) ----------
+const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isStandalone = () => { try { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch (e) { return false; } };
+function InstallHint() {
+  const [hidden, setHidden] = useState(() => lsGet('installHint', 0) > Date.now());
+  if (hidden || isNative() || isStandalone()) return null;
+  const install = S.installPrompt, ios = isIOS();
+  if (!install && !ios) return null;
+  const dismiss = () => { lsSet('installHint', Date.now() + 30 * 864e5); setHidden(true); };
+  return html`<section class="install-hint" aria-label="Installer l'application">
+    <img src="icons/icon-192.png" alt="" width="44" height="44" />
+    <div class="grow"><b>Installez Cartothèque sur votre ${ios ? 'iPhone' : 'téléphone'}</b>
+      <p class="small muted">${ios ? html`Touchez <b>Partager</b> <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px" aria-hidden="true"><path d="M12 15V3M8 7l4-4 4 4M6 11H5v10h14V11h-1" /></svg> dans Safari, puis <b>Sur l'écran d'accueil</b> : Cartothèque s'ouvre en plein écran, comme une application.` : "Accès direct depuis l'écran d'accueil, en plein écran, avec le catalogue disponible hors connexion."}</p></div>
+    ${install ? html`<button class="btn primary sm" onClick=${async () => { install.prompt(); try { await install.userChoice; } catch (e) { /* dismissed */ } S.installPrompt = null; emit(); }}>Installer</button>` : null}
+    <button class="icon-btn" aria-label="Masquer pendant un mois" onClick=${dismiss}><${Icon} n="x" /></button>
+  </section>`;
+}
+PF.InstallHint = InstallHint;
+
 // ---------- live camera scanner ----------
 function CameraModal() {
   const vid = useRef(null), frameRef = useRef(null);
@@ -360,7 +400,7 @@ function CameraModal() {
     }
     queueScans([{ blob, hint }]);
     setN(x => x + 1); setFlash(true); setTimeout(() => setFlash(false), 140);
-    try { if (navigator.vibrate) navigator.vibrate(30); } catch (e) { /* no vibration */ }
+    haptic('strong');
   };
   return html`<div class="cam" role="dialog" aria-modal="true" aria-label="Scanner">
     <video ref=${vid} class="cam-video" playsinline muted autoplay></video>

@@ -23,20 +23,87 @@ const S = {
 };
 const listeners = new Set();
 let emitQueued = false;
-function emit() { S.ver++; if (emitQueued) return; emitQueued = true; queueMicrotask(() => { emitQueued = false; listeners.forEach(f => f(S.ver)); }); }
+function emit() { S.ver++; if (emitQueued) return; emitQueued = true; queueMicrotask(flush); }
+// draw now instead of at the end of the current task (view transitions need the new page in the same callback)
+function flush() { if (!emitQueued) return; emitQueued = false; listeners.forEach(f => f(S.ver)); }
 let toastTimer;
 function toast(msg) { S.toast = msg; emit(); clearTimeout(toastTimer); toastTimer = setTimeout(() => { S.toast = null; emit(); }, 2600); }
+const reduceMotion = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
+// short vibration on meaningful actions: native haptics in the apps, vibration API on Android browsers
+function haptic(kind) {
+  try {
+    const H = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Haptics;
+    if (H && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+      if (kind === 'success') H.notification({ type: 'SUCCESS' }); else H.impact({ style: kind === 'strong' ? 'MEDIUM' : 'LIGHT' });
+    } else if (navigator.vibrate) navigator.vibrate(kind === 'success' ? [10, 50, 14] : kind === 'strong' ? 24 : 8);
+  } catch (e) { /* no haptics */ }
+}
 
 // ---------- navigation ----------
+// Routes map to the address bar (#card/sv03.5-151, #cards/pikachu…): links can be shared and a reload stays on the same page.
+const ROUTE_ARG = { card: 'id', set: 'id', binder: 'id', trade: 'id', user: 'uid', cards: 'q', collection: 'tab', market: 'tab' };
+const ROUTE_NAMES = ['home', 'cards', 'sets', 'set', 'card', 'scan', 'collection', 'binder', 'market', 'trade', 'user', 'profile', 'admin', 'about'];
+function routeHash(r) {
+  if (!r || r.name === 'home' || !ROUTE_NAMES.includes(r.name)) return '';
+  const k = ROUTE_ARG[r.name], a = k && r.params ? r.params[k] : '';
+  return '#' + r.name + (a ? '/' + encodeURIComponent(a) : '');
+}
+function routeFromHash(h) {
+  const m = /^#?([a-z]+)(?:\/(.*))?$/.exec(h || '');
+  if (!m || !ROUTE_NAMES.includes(m[1])) return null;
+  const params = {};
+  if (m[2] && ROUTE_ARG[m[1]]) { try { params[ROUTE_ARG[m[1]]] = decodeURIComponent(m[2]); } catch (e) { return null; } }
+  if (ROUTE_ARG[m[1]] === 'id' || m[1] === 'user') { if (!m[2]) return null; }
+  return { name: m[1], params };
+}
 function go(name, params = {}) {
+  S.route.y = window.scrollY || 0;
   S.hist.push(S.route);
   if (S.hist.length > 40) S.hist.shift();
   S.route = { name, params };
+  S.navDir = 'fwd';
   if (PF.onNavigate) PF.onNavigate();
   emit();
   try { window.scrollTo({ top: 0 }); } catch (e) { /* ignore */ }
 }
-function back() { S.route = S.hist.pop() || { name: 'home', params: {} }; emit(); }
+function back() {
+  S.route = S.hist.pop() || { name: 'home', params: {} };
+  S.navDir = 'back';
+  const y = S.route.y || 0;
+  emit();
+  // put the previous list back where the user left it, once it is drawn again
+  queueMicrotask(() => requestAnimationFrame(() => { try { window.scrollTo({ top: y }); } catch (e) { /* ignore */ } }));
+}
+// in-app « Retour » buttons: go through the browser history when there is one, so the address bar stays in step
+function goBack() { if (PF.historyBack && S.hist.length) PF.historyBack(); else withTransition(back); }
+
+// ---------- page transitions ----------
+const canTransition = () => typeof document !== 'undefined' && !!document.startViewTransition && !reduceMotion();
+// card tile → card page: the tile grows into the card visual (View Transitions API where available)
+function openCard(id, tileEl) {
+  if (!tileEl || !canTransition()) { go('card', { id }); return; }
+  tileEl.style.viewTransitionName = 'card-hero';
+  const t = document.startViewTransition(() => { go('card', { id }); flush(); });
+  t.ready.catch(() => {});   // skipped when the page is hidden or another transition starts
+  t.finished.finally(() => { tileEl.style.viewTransitionName = ''; }).catch(() => {});
+}
+// any navigation function; when leaving a card page, the card shrinks back into its tile if that tile is on screen
+function withTransition(fn) {
+  const from = S.route;
+  if (!canTransition()) { fn(); return; }
+  let el = null;
+  const t = document.startViewTransition(() => {
+    fn(); flush();
+    if (S.navDir === 'back') { try { window.scrollTo({ top: S.route.y || 0 }); } catch (e) { /* ignore */ } }
+    if (from.name === 'card' && from.params.id) {
+      const cand = document.querySelector(`[data-cid="${CSS.escape(from.params.id)}"] .tile`);
+      const r = cand && cand.getBoundingClientRect();
+      if (r && r.bottom > 0 && r.top < innerHeight) { el = cand; el.style.viewTransitionName = 'card-hero'; }
+    }
+  });
+  t.ready.catch(() => {});
+  t.finished.finally(() => { if (el) el.style.viewTransitionName = ''; }).catch(() => {});
+}
 
 // ---------- write queue: one write at a time per document, latest state wins ----------
 const wq = new Map();   // path -> { busy, next }

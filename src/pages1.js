@@ -14,9 +14,54 @@ const NAV = [
 const SECTION_OF = { set: 'sets', card: 'cards', binder: 'collection', trade: 'market', user: 'market', about: 'profile', admin: 'admin' };
 const section = () => SECTION_OF[S.route.name] || S.route.name;
 
-function TopBar() {
+// closes a popup when the user clicks or taps anywhere else
+function useOutside(ref, open, close) {
+  useEffect(() => {
+    if (!open) return;
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) close(); };
+    document.addEventListener('pointerdown', h);
+    return () => document.removeEventListener('pointerdown', h);
+  }, [open]);
+}
+
+function SearchSuggest() {
   const [q, setQ] = useState('');
+  const [dq, setDq] = useState('');
   const [open, setOpen] = useState(false);
+  const [sel, setSel] = useState(-1);
+  const box = useRef(null), inp = useRef(null);
+  useOutside(box, open, () => setOpen(false));
+  useEffect(() => { const t = setTimeout(() => { setDq(q); setSel(-1); }, 110); return () => clearTimeout(t); }, [q]);
+  useEffect(() => {
+    const k = e => { if (e.key === '/' && !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '') && inp.current) { e.preventDefault(); inp.current.focus(); } };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, []);
+  const res = useMemo(() => dq.trim().length >= 2 ? searchCards(dq, {}) : [], [dq]);
+  // cards that already have a market price first (a brand-new extension would otherwise fill the list with « — »)
+  const shown = useMemo(() => res.slice(0, 80).sort((a, b) => (b.p > 0) - (a.p > 0)).slice(0, 6), [res]);
+  const pick = c => { setOpen(false); setQ(''); inp.current && inp.current.blur(); go('card', { id: c.id }); };
+  const all = () => { if (!q.trim()) return; setOpen(false); inp.current && inp.current.blur(); go('cards', { q: q.trim() }); setQ(''); };
+  const key = e => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setSel(i => Math.min(shown.length - 1, i + 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setSel(i => Math.max(-1, i - 1)); }
+    else if (e.key === 'Escape') { setOpen(false); inp.current.blur(); }
+  };
+  return html`<form class="top-search" ref=${box} role="search" onSubmit=${e => { e.preventDefault(); if (sel >= 0 && shown[sel]) pick(shown[sel]); else all(); }}>
+    <input ref=${inp} autocomplete="off" id="top-q" type="search" placeholder="Rechercher une carte…  ( / )" value=${q} onInput=${e => { setQ(e.target.value); setOpen(true); }} onFocus=${() => setOpen(true)} onKeyDown=${key} aria-label="Rechercher une carte" aria-expanded=${String(open && shown.length > 0)} aria-controls="top-q-list" />
+    ${open && shown.length ? html`<div class="dropdown suggest" id="top-q-list" role="listbox">
+      ${shown.map((c, i) => html`<button type="button" role="option" aria-selected=${String(i === sel)} class=${'sug' + (i === sel ? ' on' : '')} onPointerEnter=${() => setSel(i)} onClick=${() => pick(c)}>
+        <${MiniTile} c=${c} w=${34} /><span class="grow" style="min-width:0"><b class="nm">${cardName(c)}</b><span class="tiny muted">${c.set.n} · ${numLabel(c)}</span></span><span class="num small">${fmtEUR(c.p)}</span>
+      </button>`)}
+      <button type="submit" class="sug all">${res.length > shown.length ? `Voir les ${fmtInt(res.length)} résultats` : 'Voir la page de résultats'} <${Icon} n="right" s=${14} /></button>
+    </div>` : null}
+  </form>`;
+}
+
+function TopBar() {
+  const [open, setOpen] = useState(false);
+  const bell = useRef(null);
+  useOutside(bell, open, () => setOpen(false));
   const notes = notifications();
   return html`<header class="top"><div class="top-in">
     <button class="brand" onClick=${() => go('home')} aria-label="Accueil Cartothèque"><span class="brand-mark"></span><span class="brand-name">Cartothèque</span></button>
@@ -24,12 +69,11 @@ function TopBar() {
       ${NAV.map(n => html`<button aria-current=${section() === n.r ? 'page' : null} onClick=${() => go(n.r)}>${n.l}</button>`)}
       ${isAdmin() ? html`<button aria-current=${section() === 'admin' ? 'page' : null} onClick=${() => go('admin')}>Admin</button>` : null}
     </nav>
-    <form class="top-search" onSubmit=${e => { e.preventDefault(); if (q.trim()) go('cards', { q: q.trim() }); }}>
-      <input autocomplete="off" id="top-q" type="search" placeholder="Rechercher une carte…" value=${q} onInput=${e => setQ(e.target.value)} aria-label="Rechercher une carte" />
-    </form>
+    <${SearchSuggest} />
     <div class="top-actions" style="margin-left:auto">
       ${S.mode === 'local' ? html`<span class="chip" title="Vos données sont enregistrées sur cet appareil uniquement">${PF.text.chip}</span>` : null}
-      <div style="position:relative">
+      <button class="icon-btn phone-only" aria-label="Rechercher une carte" onClick=${() => go('cards')}><${Icon} n="search" /></button>
+      <div style="position:relative" ref=${bell}>
         <button class="icon-btn" aria-label="Notifications" aria-expanded=${String(open)} onClick=${() => setOpen(!open)}><${Icon} n="bell" />${notes.length ? html`<span class="badge-dot">${notes.length}</span>` : null}</button>
         ${open ? html`<div class="dropdown" role="menu">
           <div class="eyebrow" style="padding:4px 8px 8px">Notifications</div>
@@ -45,10 +89,10 @@ function TabBar() {
   const tabs = [{ r: 'home', l: 'Accueil', i: 'home' }, { r: 'collection', l: 'Collection', i: 'binder' }, { r: 'scan', l: 'Scanner', i: 'scan' }, { r: 'market', l: 'Marché', i: 'swap' }, { r: 'profile', l: 'Profil', i: 'user' }];
   return html`<nav class="tabbar" aria-label="Navigation">${tabs.map(t => t.r === 'scan'
     ? html`<button class="scan-tab" aria-current=${section() === 'scan' ? 'page' : null} onClick=${() => go('scan')}><span class="ring"><${Icon} n="scan" s=${22} /></span>${t.l}</button>`
-    : html`<button aria-current=${section() === t.r || (t.r === 'home' && ['cards', 'sets'].includes(section())) ? 'page' : null} onClick=${() => go(t.r)}><${Icon} n=${t.i} />${t.l}</button>`)}</nav>`;
+    : html`<button aria-current=${section() === t.r || (t.r === 'home' && ['cards', 'sets'].includes(section())) ? 'page' : null} onClick=${() => { if (S.route.name === t.r) window.scrollTo({ top: 0, behavior: 'smooth' }); else go(t.r); }}><span class="ti"><${Icon} n=${t.i} /></span>${t.l}</button>`)}</nav>`;
 }
 
-function Back() { return S.hist.length ? html`<button class="back" onClick=${back}><${Icon} n="left" s=${16} />Retour</button>` : null; }
+function Back() { return S.hist.length ? html`<button class="back" onClick=${goBack}><${Icon} n="left" s=${16} />Retour</button>` : null; }
 
 // ---------- home ----------
 function HomePage() {
@@ -70,7 +114,7 @@ function HomePage() {
         <div class="eyebrow">${name ? `Bonjour ${name}` : 'Bonjour'} · prix au ${snap}</div>
         <div>
           <div class="small" style="opacity:.75;margin-bottom:6px">Valeur estimée de votre collection</div>
-          <div class="big">${st.cards ? fmtEUR(st.value) : '0 €'}</div>
+          <div class="big">${st.cards ? html`<${CountUp} id="hero-value" value=${st.value} />` : '0 €'}</div>
           ${st.cards && st.d7 != null ? html`<div class="small" style="margin-top:6px">${fmtPct(st.d7)} par rapport à la moyenne 7 jours</div>` : null}
         </div>
         <div class="statline">
@@ -97,6 +141,7 @@ function HomePage() {
         ${S.mode === 'local' ? html`<div class="notice warn small stack s"><span>${PF.text.local}</span>${PF.LoginButton ? html`<${PF.LoginButton} />` : null}</div>` : null}
       </div>
     </section>
+    ${PF.InstallHint ? html`<${PF.InstallHint} />` : null}
 
     ${!st.cards && S.privLoaded ? html`<section class="stack s"><h2>Comment ça marche</h2><div class="steps-guide">
       <button class="step" onClick=${() => go('scan')}><span class="n">1</span><span><b>Scannez ou cherchez une carte</b><span class="small muted">Sa cote s'affiche aussitôt, expliquée source par source. Le scanner est gratuit et illimité.</span></span></button>
@@ -107,7 +152,7 @@ function HomePage() {
     <section class="grid-2">
       <div class="panel">
         <div class="section-h"><h2>En hausse cette semaine</h2><span class="tiny muted">tendance vs moyenne 7 j · cartes > 3 €</span></div>
-        ${movers.map(c => html`<button class="mover" onClick=${() => go('card', { id: c.id })}><${MiniTile} c=${c} w=${40} /><span style="min-width:0"><span class="nm" style="display:block">${cardName(c)}</span><span class="tiny muted">${c.set.n} · ${numLabel(c)}</span></span><span style="text-align:right"><span class="num small" style="display:block">${fmtEUR(c.p)}</span><${Delta} x=${c.d7} /></span></button>`)}
+        ${movers.map(c => html`<button class="mover" data-cid=${c.id} onClick=${e => openCard(c.id, e.currentTarget.querySelector('.tile'))}><${MiniTile} c=${c} w=${40} /><span style="min-width:0"><span class="nm" style="display:block">${cardName(c)}</span><span class="tiny muted">${c.set.n} · ${numLabel(c)}</span></span><span style="text-align:right"><span class="num small" style="display:block">${fmtEUR(c.p)}</span><${Delta} x=${c.d7} /></span></button>`)}
       </div>
       <div class="panel">
         <div class="section-h"><h2>Nouvelles extensions</h2><button class="btn ghost sm" onClick=${() => go('sets')}>Tout voir</button></div>
@@ -135,16 +180,18 @@ function SetRow({ s }) {
 
 // ---------- catalogue ----------
 function CardsPage({ q: q0, serie: serie0 }) {
-  const [q, setQ] = useState(q0 || '');
-  const [dq, setDq] = useState(q0 || '');
-  const [serie, setSerie] = useState(serie0 || '');
-  const [setIdx, setSetIdx] = useState('');
-  const [cat, setCat] = useState('');
-  const [type, setType] = useState('');
-  const [rarity, setRarity] = useState('');
-  const [sort, setSort] = useState('relevance');
-  const [n, setN] = useState(60);
-  useEffect(() => { const t = setTimeout(() => { setDq(q); setN(60); }, 160); return () => clearTimeout(t); }, [q]);
+  const [q, setQ] = useRouteState('q', q0 || '');
+  const [dq, setDq] = useState(q);
+  const [serie, setSerie] = useRouteState('serie', serie0 || '');
+  const [setIdx, setSetIdx] = useRouteState('set', '');
+  const [cat, setCat] = useRouteState('cat', '');
+  const [type, setType] = useRouteState('type', '');
+  const [rarity, setRarity] = useRouteState('rarity', '');
+  const [sort, setSort] = useRouteState('sort', 'relevance');
+  const [n, setN] = useRouteState('n', 60);
+  const [showF, setShowF] = useRouteState('filters', false);
+  const nF = [serie, setIdx, cat, type, rarity].filter(x => x !== '').length;
+  useEffect(() => { if (q === dq) return; const t = setTimeout(() => { setDq(q); setN(60); }, 160); return () => clearTimeout(t); }, [q]);
   const res = useMemo(() => {
     if (!dq.trim() && setIdx === '' && !serie && cat === '' && type === '' && rarity === '') return null;
     return searchCards(dq, { setIdx: setIdx === '' ? null : +setIdx, serie, cat, type, rarity, sort });
@@ -153,14 +200,18 @@ function CardsPage({ q: q0, serie: serie0 }) {
   return html`<div class="stack">
     <div class="spread"><h1>Toutes les cartes</h1><span class="small muted">${fmtInt(CAT.meta.cards)} cartes référencées</span></div>
     <div class="panel stack s">
-      <input autocomplete="off" id="cards-q" type="search" placeholder="Nom de la carte, numéro (125/197) ou code d'extension (MEW 6)" value=${q} onInput=${e => setQ(e.target.value)} autofocus />
-      <div class="row tight">
+      <input autocomplete="off" id="cards-q" type="search" enterkeyhint="search" placeholder="Nom de la carte, numéro (125/197) ou code d'extension (MEW 6)" value=${q} onInput=${e => setQ(e.target.value)} onKeyDown=${e => { if (e.key === 'Enter') e.currentTarget.blur(); }} autofocus=${S.navDir !== 'back' && !q} />
+      <div class="row tight phone-flex">
+        <button class=${'btn sm' + (nF ? ' primary' : '')} aria-expanded=${String(showF)} aria-controls="cards-filters" onClick=${() => setShowF(!showF)}><${Icon} n="layers" />Filtres${nF ? ` (${nF})` : ''}</button>
+        <select aria-label="Tri" class="grow" value=${sort} onChange=${e => setSort(e.target.value)}><option value="relevance">Pertinence</option><option value="price-desc">Prix décroissant</option><option value="price-asc">Prix croissant</option><option value="recent">Plus récentes</option><option value="number">Extension et numéro</option></select>
+      </div>
+      <div id="cards-filters" class=${'row tight filters' + (showF ? ' open' : '')}>
         <select id="f-serie" aria-label="Série" value=${serie} onChange=${e => { setSerie(e.target.value); setSetIdx(''); }}><option value="">Toutes les séries</option>${[...CAT.series].reverse().map(s => html`<option value=${s.id}>${s.n}</option>`)}</select>
         <select id="f-set" aria-label="Extension" value=${setIdx} onChange=${e => setSetIdx(e.target.value)}><option value="">Toutes les extensions</option>${setsOfSerie.map(s => html`<option value=${s.i}>${s.n}</option>`)}</select>
         <select id="f-cat" aria-label="Catégorie" value=${cat} onChange=${e => setCat(e.target.value)}><option value="">Pokémon, Dresseur, Énergie</option>${CAT.meta.cats.map((c, i) => html`<option value=${i}>${c}</option>`)}</select>
         <select id="f-type" aria-label="Type" value=${type} onChange=${e => setType(e.target.value)}><option value="">Tous les types</option>${CAT.meta.types.map((t, i) => html`<option value=${i}>${t}</option>`)}</select>
         <select id="f-rarity" aria-label="Rareté" value=${rarity} onChange=${e => setRarity(e.target.value)}><option value="">Toutes les raretés</option>${CAT.meta.rarities.map((r, i) => html`<option value=${i}>${r}</option>`)}</select>
-        <select id="f-sort" aria-label="Tri" value=${sort} onChange=${e => setSort(e.target.value)}><option value="relevance">Pertinence</option><option value="price-desc">Prix décroissant</option><option value="price-asc">Prix croissant</option><option value="recent">Plus récentes</option><option value="number">Extension et numéro</option></select>
+        <select id="f-sort" class="desk-only" aria-label="Tri" value=${sort} onChange=${e => setSort(e.target.value)}><option value="relevance">Pertinence</option><option value="price-desc">Prix décroissant</option><option value="price-asc">Prix croissant</option><option value="recent">Plus récentes</option><option value="number">Extension et numéro</option></select>
       </div>
     </div>
     ${res === null ? html`<div class="stack">
@@ -186,7 +237,7 @@ function SetsPage() {
 
 function SetPage({ id }) {
   const s = CAT.setById.get(id);
-  const [view, setView] = useState('all');
+  const [view, setView] = useRouteState('view', 'all');
   const [showMissing, setShowMissing] = useState(false);
   if (!s) return html`<${Empty} title="Extension introuvable" />`;
   const om = owned();
@@ -322,11 +373,11 @@ function CardPage({ id }) {
     <div><${Back} /></div>
     <div class="card-page">
       <div class="stack card-visual">
-        <div class="tile-wrap"><${CardTile} c=${c} vi=${vi} hq=${true} /></div>
+        <div class="tile-wrap"><${Tilt}><${CardTile} c=${c} vi=${vi} hq=${true} /><//></div>
         <div class="mobile-only price-line"><span class="num">${est.value ? fmtEUR(est.value, false) : 'Cote indisponible'}</span>${est.value ? html`<span class="small"><span class="conf-dot" style=${`background:${confColor(est.conf)}`}></span>confiance ${est.conf} %</span>` : null}</div>
         <div class="action-grid">
           <button class="action" onClick=${() => openModal('add', { id, vi })}><span class="ic" style="background:var(--st-own)">+</span>${st.own ? `Possédée ×${st.own}` : 'Ajouter'}</button>
-          <button class=${'action' + (st.want ? ' on' : '')} style=${st.want ? 'color:var(--st-want)' : ''} onClick=${() => { toggleWish(id); toast(st.want ? 'Retirée de vos recherches' : 'Ajoutée à vos recherches'); }}><span class="ic" style="background:var(--st-want)">♥</span>${st.want ? 'Recherchée' : 'Rechercher'}</button>
+          <button class=${'action' + (st.want ? ' on' : '')} style=${st.want ? 'color:var(--st-want)' : ''} onClick=${() => { toggleWish(id); haptic(); toast(st.want ? 'Retirée de vos recherches' : 'Ajoutée à vos recherches'); }}><span class="ic" style="background:var(--st-want)">♥</span>${st.want ? 'Recherchée' : 'Rechercher'}</button>
           <button class=${'action' + (st.trade ? ' on' : '')} style=${st.trade ? 'color:var(--st-trade)' : ''} onClick=${needOwn(() => openModal('copies', { id, mode: 'trade' }))}><span class="ic" style="background:var(--st-trade)">⇄</span>${st.trade ? `${st.trade} à l'échange` : 'Échanger'}</button>
           <button class=${'action' + (st.sell ? ' on' : '')} style=${st.sell ? 'color:var(--st-sell)' : ''} onClick=${needOwn(() => openModal('copies', { id, mode: 'sell' }))}><span class="ic" style="background:var(--st-sell)">€</span>${st.sell ? `${st.sell} en vente` : 'Vendre'}</button>
         </div>
@@ -334,6 +385,7 @@ function CardPage({ id }) {
         <div class="row tight" style="justify-content:center">
           ${img ? html`<a class="btn ghost sm" href=${img} target="_blank" rel="noopener">Image officielle <${Icon} n="ext" s=${14} /></a>` : null}
           <a class="btn ghost sm" href=${'https://www.cardmarket.com/fr/Pokemon/Products/Search?searchString=' + encodeURIComponent(cardName(c))} target="_blank" rel="noopener">Cardmarket <${Icon} n="ext" s=${14} /></a>
+          ${PF.shareLink ? html`<button class="btn ghost sm" onClick=${() => PF.shareLink(`${cardName(c)} · ${c.set.n} ${numLabel(c)}`, routeHash({ name: 'card', params: { id } }))}><${Icon} n="send" s=${14} />Partager</button>` : null}
         </div>
       </div>
 

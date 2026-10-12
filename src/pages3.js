@@ -208,7 +208,10 @@ function ProfilePage() {
     <div class="spread"><div class="row"><${Avatar} uid=${S.me.id} size="lg" /><div class="stack s"><h1>${p.pseudo || S.me.name || 'Mon profil'}</h1><span class="small muted">${S.mode === 'cloud' ? PF.text.account : 'Mode invité · données sur cet appareil'}</span></div></div>
       <div class="row">${S.mode === 'cloud' ? html`<button class="btn" onClick=${() => go('user', { uid: S.me.id })} disabled=${!pubOf(S.me.id)}>Voir mon profil public</button>` : null}<button class="btn ghost" onClick=${() => go('about')}><${Icon} n="info" />À propos</button>${isAdmin() ? html`<button class="btn dark" onClick=${() => go('admin')}><${Icon} n="shield" />Administration</button>` : null}</div>
     </div>
-    ${PF.AccountPanel ? html`<${PF.AccountPanel} />` : null}
+    <div class="grid-2" style="align-items:start">
+      ${PF.AccountPanel ? html`<${PF.AccountPanel} />` : null}
+      <${ThemePanel} />
+    </div>
     <div class="grid-2">
       <div class="panel stack">
         <h2>Profil public</h2>
@@ -237,6 +240,26 @@ function ProfilePage() {
         <button class="btn danger" onClick=${() => openModal('confirm', { title: PF.text.deleteTitle, text: PF.text.deleteText, confirm: 'Tout supprimer', danger: true, onConfirm: async () => { await deleteMyData(); toast('Vos données ont été supprimées'); go('home'); } })}><${Icon} n="trash" />Supprimer mes données</button>
       </div>
     </div>
+  </div>`;
+}
+
+// ---------- appearance (per device) ----------
+const THEME_COLORS = { light: '#edf0f4', dark: '#0d1015' };
+function applyTheme() {
+  const t = lsGet('theme', 'auto');
+  const root = document.documentElement;
+  if (t === 'light' || t === 'dark') root.setAttribute('data-theme', t); else root.removeAttribute('data-theme');
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => {
+    const own = (m.getAttribute('media') || '').includes('dark') ? 'dark' : 'light';
+    m.setAttribute('content', THEME_COLORS[t === 'auto' ? own : t]);
+  });
+}
+function ThemePanel() {
+  const [t, setT] = useState(lsGet('theme', 'auto'));
+  return html`<div class="panel stack s">
+    <h2>Apparence</h2>
+    <${Seg} label="Thème" options=${[{ v: 'auto', l: 'Automatique' }, { v: 'light', l: 'Clair' }, { v: 'dark', l: 'Sombre' }]} value=${t} onChange=${v => { lsSet('theme', v); setT(v); applyTheme(); }} />
+    <span class="tiny muted">« Automatique » suit le réglage de votre appareil. Ce choix ne concerne que cet appareil.</span>
   </div>`;
 }
 
@@ -403,26 +426,28 @@ function App() {
   if (S.catError) return html`<div class="loading"><h2>Le catalogue n'a pas pu être chargé</h2><p class="small">Vérifiez votre connexion puis rechargez la page. (${S.catError})</p></div>`;
   if (!CAT.ready) return html`<div class="loading"><div class="spinner"></div><div><b>Ouverture du catalogue…</b><p class="small">plus de 20 000 cartes et leurs cotes</p></div></div>`;
   const P = PAGES[S.route.name] || HomePage;
-  if (S.route.name === 'auth') return html`<div class="app"><${P} />${S.toast ? html`<div class="toast" role="status">${S.toast}</div>` : null}</div>`;
+  if (S.route.name === 'auth') return html`<div class="app"><${P} />${S.toast ? html`<div class="toast" role="status" key=${S.toast}>${S.toast}</div>` : null}</div>`;
   return html`<div class="app">
     <${TopBar} />
     ${S.config.banner ? html`<div class="notice" style="border-radius:0;text-align:center">${S.config.banner}</div>` : null}
-    <main id="main"><${P} key=${S.route.name + ':' + JSON.stringify(S.route.params)} ...${S.route.params} /></main>
+    <main id="main" class=${S.navDir === 'back' ? 'nav-back' : ''}><${P} key=${S.route.name + ':' + JSON.stringify(S.route.params)} ...${S.route.params} /></main>
     <footer style="max-width:1180px;margin:0 auto;padding:0 16px 120px;width:100%"><p class="tiny muted">Cartothèque · projet indépendant, non affilié à The Pokémon Company · prix au ${fmtDate(CAT.meta.snapshot)} (Cardmarket, TCGplayer via TCGdex) · <button class="btn ghost sm" style="padding:2px 6px" onClick=${() => go('about')}>À propos et feuille de route</button></p></footer>
     <${TabBar} />
-    ${S.toast ? html`<div class="toast" role="status">${S.toast}</div>` : null}
+    ${S.toast ? html`<div class="toast" role="status" key=${S.toast}>${S.toast}</div>` : null}
     <${ModalHost} />
   </div>`;
 }
 
 (async function boot() {
+  applyTheme();
   const root = document.getElementById('root');
+  root.textContent = '';   // drop the placeholder shown while the scripts were loading
   const draw = () => render(html`<${App} v=${S.ver} />`, root);
   listeners.add(draw);
   draw();
   try { await loadCatalogue(); } catch (e) { S.catError = String((e && e.message) || e); }
   emit();
-  const hash = (location.hash || '').slice(1);
-  if (['scan', 'collection', 'market', 'cards', 'sets', 'profile', 'about'].includes(hash)) { S.route = { name: hash, params: {} }; emit(); }
+  const r0 = routeFromHash(location.hash);
+  if (r0 && !(r0.params.id && r0.name === 'card' && !CAT.byId.has(r0.params.id))) { S.route = r0; emit(); }
   if (!S.catError) initPlatform().catch(e => { console.warn('platform', e); startLocal(); });
 })();

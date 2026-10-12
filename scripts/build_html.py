@@ -45,7 +45,6 @@ if not os.path.exists(cfg_path):
     open(cfg_path, "w", encoding="utf-8").write("window.CARTO_CONFIG = { supabaseUrl: '', supabaseKey: '' };\n")
 cfg_version = hashlib.sha1(open(cfg_path, "rb").read()).hexdigest()[:8]
 base_css = """html{-webkit-text-size-adjust:100%}
-:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0}
 img{max-width:100%}
 [hidden]{display:none!important}
@@ -57,21 +56,31 @@ page = f"""<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Cartothèque</title>
 <meta name="description" content="Collection, cote et échanges de cartes Pokémon : catalogue français complet, scanner, classeurs virtuels.">
-<meta name="theme-color" content="#12151b">
+<meta name="theme-color" content="#edf0f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d1015" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cartothèque">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="preload" href="data/catalogue.json" as="fetch" crossorigin="anonymous">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://assets.tcgdex.net">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="{FONTS}">
+<script>try{{var t=JSON.parse(localStorage.getItem('cartotheque:theme')||'"auto"');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}}catch(e){{}}</script>
 <style>
 {base_css}
 {css}
 </style>
 </head>
 <body>
-<div id="root"></div>
+<div id="root"><div class="loading"><div class="spinner"></div><div><b>Ouverture de Cartothèque…</b><p class="small">catalogue, cotes et collection</p></div></div></div>
 <script src="{PREACT}"></script>
 <script src="{SUPABASE}"></script>
 <script src="config.js?v={cfg_version}"></script>
