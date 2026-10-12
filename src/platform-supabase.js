@@ -54,6 +54,15 @@ const PF = {
   async tradeSay(t, text) { const { error } = await sb.rpc('post_trade_message', { p_trade: t.id, p_body: text }); sbFail(error); loadTradesSoon(); },
   async tradeStatus(t, s, extra) { const { error } = await sb.rpc('set_trade_status', { p_trade: t.id, p_status: s, p_final_price: extra && extra.finalPrice ? extra.finalPrice : null }); sbFail(error); loadTradesSoon(); },
   async tradeSeen(t) { await sb.rpc('mark_trade_seen', { p_trade: t.id }); loadTradesSoon(); },
+  async tradeConfirm(t, finalPrice) { const { data, error } = await sb.rpc('confirm_received', { p_trade: t.id, p_final_price: finalPrice || null }); sbFail(error); loadTradesSoon(); return data; },
+  async tradeDispute(t, reason) { const { error } = await sb.rpc('open_dispute', { p_trade: t.id, p_reason: reason }); sbFail(error); loadTradesSoon(); },
+  async review(t, rating, comment) { const { error } = await sb.from('trade_reviews').insert({ trade_id: t.id, target: t.a === S.me.id ? t.b : t.a, rating, comment: comment || null }); sbFail(error); },
+  async trust(ids) {
+    const { data, error } = await sb.rpc('member_trust', { p_ids: ids }); sbFail(error);
+    return (data || []).map(r => ({ id: r.id, since: msOf(r.member_since), done: r.done_trades, disputes: r.disputes, pos: r.positive, neu: r.neutral, neg: r.negative }));
+  },
+  async uploadProof(blob, path) { const { error } = await sb.storage.from('proofs').upload(path, blob, { contentType: 'image/jpeg', upsert: false }); sbFail(error); return path; },
+  proofUrl: path => sb ? sb.storage.from('proofs').getPublicUrl(path).data.publicUrl : '',
   recordSale: null,   // purchases are recorded server-side when a trade is concluded
   async fetchSales(id) {
     const { data } = await sb.from('sales').select('price, condition, created_at').eq('card_id', id).order('created_at', { ascending: false }).limit(20);
@@ -135,6 +144,7 @@ async function loadPubs() {
   }
   S.pubs = m; S.config = { ...S.config, banned }; S.pubLoaded = true;
   schedulePub(); emit();
+  loadTrust([...m.keys()]);
 }
 async function loadTrades() {
   if (!sb || S.mode !== 'cloud') return;
@@ -143,14 +153,19 @@ async function loadTrades() {
   let msgs = [];
   if (ids.length) { const r = await sb.from('trade_messages').select('*').in('trade_id', ids).order('created_at').limit(5000); msgs = r.data || []; }
   S.trades = (ts || []).map(t => {
-    const o = { id: t.id, parties: [t.a, t.b], a: t.a, b: t.b, give: t.give || [], get: t.get || [], kind: t.kind, price: +t.price || 0, finalPrice: t.final_price != null ? +t.final_price : undefined, status: t.status, at: msOf(t.created_at), upd: msOf(t.updated_at), lastBy: t.last_by, seen: t.seen || {}, msgs: {}, events: {} };
+    const o = { id: t.id, parties: [t.a, t.b], a: t.a, b: t.b, give: t.give || [], get: t.get || [], kind: t.kind, price: +t.price || 0, finalPrice: t.final_price != null ? +t.final_price : undefined, status: t.status, received: t.received || {}, at: msOf(t.created_at), upd: msOf(t.updated_at), lastBy: t.last_by, seen: t.seen || {}, msgs: {}, events: {} };
     for (const x of msgs) if (x.trade_id === t.id) {
-      if (x.kind === 'event') o.events[x.id] = { by: x.author, s: x.status, at: msOf(x.created_at) };
+      if (x.kind === 'event') o.events[x.id] = { by: x.author, s: x.status, at: msOf(x.created_at), t: x.body || '' };
       else o.msgs[x.id] = { by: x.author, t: x.body, at: msOf(x.created_at) };
     }
     return o;
   });
   emit();
+  loadTrust(S.trades.map(t => (t.a === S.me.id ? t.b : t.a)));
+  if (S.trades.some(t => t.status === 'done')) {
+    const { data } = await sb.from('trade_reviews').select('trade_id').eq('author', S.me.id).limit(1000);
+    S.myReviews = new Set((data || []).map(r => r.trade_id)); emit();
+  }
 }
 let tradeTimer = null;
 function loadTradesSoon() { clearTimeout(tradeTimer); tradeTimer = setTimeout(loadTrades, 250); }

@@ -17,7 +17,7 @@ def read(name):
         return f.read()
 
 platform = "platform-claude.js" if TARGET == "artifact" else "platform-supabase.js"
-modules = ["core.js", "store.js", platform] + (["visual.js"] if TARGET == "web" else []) + ["components.js", "pages1.js", "pages2.js", "pages3.js"]
+modules = ["core.js", "store.js", platform] + (["visual.js"] if TARGET == "web" else []) + ["components.js", "trust.js", "pages1.js", "pages2.js", "pages3.js"]
 js = "\n".join(read(f) for f in modules)
 css = read("style.css")
 

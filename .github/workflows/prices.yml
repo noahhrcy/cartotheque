@@ -26,6 +26,13 @@ jobs:
         run: |
           pip install --quiet Pillow==12.3.0 numpy==2.5.3
           python scripts/build_visual_index.py public vcache
+      - name: Garder le serveur Supabase actif (pause après 7 jours sans activité sur l'offre gratuite)
+        run: |
+          URL=$(grep -o "https://[a-z0-9]*\.supabase\.co" public/config.js || true)
+          KEY=$(grep -o "sb_publishable_[A-Za-z0-9_-]*" public/config.js || true)
+          if [ -n "$URL" ] && [ -n "$KEY" ]; then
+            curl -s -o /dev/null -w "Supabase : %{http_code}\n" "$URL/rest/v1/app_config?select=id" -H "apikey: $KEY" || true
+          fi
       - name: Enregistrer
         run: |
           git config user.name "github-actions[bot]"

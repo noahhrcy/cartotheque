@@ -229,7 +229,12 @@ function CopiesModal({ id, mode }) {
           <td><input autocomplete="off" aria-label="Prix demandé" type="text" inputmode="decimal" style="width:84px" value=${it.sp ? String(it.sp).replace('.', ',') : ''} placeholder=${fmtEUR(variantPrice(c, it.v) * condF(it.k))} onChange=${e => updateItem(it, { sp: parseFloat(e.target.value.replace(',', '.')) || undefined })} /></td>
           <td class="r num">${fmtEUR(itemValue(it))}</td>
           <td><button class="icon-btn" style="width:32px;height:32px" aria-label="Retirer de la collection" onClick=${() => removeItem(it)}><${Icon} n="trash" s=${15} /></button></td>
-        </tr>`)}</tbody></table></div>` : html`<${Empty} title="Vous ne possédez pas encore cette carte" action=${html`<button class="btn primary" onClick=${() => openModal('add', { id })}>Ajouter à ma collection</button>`} />`}
+        </tr>${it.sq > 0 ? html`<tr key=${it.id + '-proof'}><td colspan="9">
+          <div class="row tight">
+            ${it.proof && it.proof.p ? html`<${ProofView} proof=${it.proof} compact=${true} />` : (it.sp >= PROOF_MIN_PRICE ? html`<span class="small" style="color:var(--down)">⚠ Annonce non publiée : une photo réelle est obligatoire à partir de ${PROOF_MIN_PRICE} €.</span>` : html`<span class="tiny muted">Une photo réelle rassure les acheteurs (obligatoire à partir de ${PROOF_MIN_PRICE} €).</span>`)}
+            ${S.mode === 'cloud' && PF.uploadProof ? html`<button class="btn sm" onClick=${() => openModal('proof', { item: it })}><${Icon} n="camera" />${it.proof && it.proof.p ? 'Changer la photo' : 'Ajouter une photo réelle'}</button>` : null}
+          </div>
+        </td></tr>` : null}`)}</tbody></table></div>` : html`<${Empty} title="Vous ne possédez pas encore cette carte" action=${html`<button class="btn primary" onClick=${() => openModal('add', { id })}>Ajouter à ma collection</button>`} />`}
       <div class="row" style="justify-content:space-between"><button class="btn sm" onClick=${() => openModal('add', { id })}><${Icon} n="plus" />Autre exemplaire</button><button class="btn dark" onClick=${closeModal}>Terminé</button></div>
     </div>
   <//>`;
@@ -328,8 +333,10 @@ function ListingModal({ l }) {
         <div class="row tight"><span class="chip">${langS(l.g)}</span><span class="chip">${l.k}</span><span class="chip">${plural(l.q, 'exemplaire')}</span></div>
         <div class="row"><span class="num" style="font-size:1.5rem;font-weight:700">${fmtEUR(l.price)}</span><span class="small muted">cote ${fmtEUR(variantPrice(c, l.v) * condF(l.k))}</span></div>
       </div></div>
-      <div class="row"><${Avatar} uid=${l.uid} size="sm" /><span><b>${displayName(l.uid, l.pub)}</b>${l.pub.region ? html` · <span class="muted">${l.pub.region}</span>` : null}</span><span class="chip">Réputation : à venir</span></div>
-      <p class="tiny muted">Photos réelles, paiement sécurisé et protection acheteur arriveront avec la marketplace (phase 3). En attendant, vérifiez la carte avant tout paiement.</p>
+      <div class="row"><${Avatar} uid=${l.uid} size="sm" /><span><b>${displayName(l.uid, l.pub)}</b>${l.pub.region ? html` · <span class="muted">${l.pub.region}</span>` : null}</span><${TrustBadge} uid=${l.uid} long=${true} /></div>
+      ${l.proof ? html`<${ProofView} proof=${l.proof} />` : html`<p class="small notice warn">Pas de photo réelle pour cette annonce : demandez au vendeur une photo de la carte avec votre pseudo et la date du jour avant de payer.</p>`}
+      ${(() => { const r = priceRisk(l.price, c, l.v, l.k); return r ? html`<p class=${'small notice' + (r.level === 'danger' ? ' danger' : r.level === 'warn' ? ' warn' : '')}>${r.text}</p>` : null; })()}
+      <p class="tiny muted">Paiement protégé uniquement (PayPal « Biens et services » ou en main propre), envoi suivi. La réception se confirme des deux côtés dans l'échange ; en cas de problème, ouvrez un litige.</p>
       <div class="row" style="justify-content:space-between"><button class="btn ghost sm" onClick=${() => openModal('report', { target: l.uid, ctx: { card: c.id } })}><${Icon} n="flag" />Signaler</button><div class="row"><button class="btn" onClick=${() => { closeModal(); go('card', { id: c.id }); }}>Voir la cote</button><button class="btn primary" disabled=${S.mode !== 'cloud'} onClick=${() => openModal('trade', { to: l.uid, wantIds: [c.id] })}>Contacter le vendeur</button></div></div>
     </div>
   <//>`;

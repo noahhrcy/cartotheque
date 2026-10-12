@@ -28,7 +28,7 @@ function Matches() {
     ${ms.length ? ms.map(m => html`<div class="match" key=${m.uid}>
       <${Avatar} uid=${m.uid} />
       <div class="stack s" style="min-width:0">
-        <div class="row tight"><b>${displayName(m.uid, m.pub)}</b>${m.pub.region ? html`<span class="small muted">${m.pub.region}</span>` : null}${m.compatible ? html`<span class="chip pill-own">Échange potentiellement compatible</span>` : null}</div>
+        <div class="row tight"><b>${displayName(m.uid, m.pub)}</b>${m.pub.region ? html`<span class="small muted">${m.pub.region}</span>` : null}<${TrustBadge} uid=${m.uid} />${m.compatible ? html`<span class="chip pill-own">Échange potentiellement compatible</span>` : null}</div>
         ${m.offerMatch.length ? html`<span class="small">Propose <b>${plural(m.offerMatch.length, 'carte')}</b> que vous recherchez : ${m.offerMatch.slice(0, 4).map(id => cardName(CAT.byId.get(id))).join(', ')}${m.offerMatch.length > 4 ? '…' : ''}</span>` : null}
         ${m.haveMatch.length ? html`<span class="small muted">Possède aussi ${plural(m.haveMatch.length, 'carte')} de votre wishlist (pas encore proposée${m.haveMatch.length > 1 ? 's' : ''})</span>` : null}
         ${m.theyWantMine.length ? html`<span class="small">Recherche <b>${plural(m.theyWantMine.length, 'de vos doubles', 'de vos doubles')}</b> : ${m.theyWantMine.slice(0, 4).map(id => cardName(CAT.byId.get(id))).join(', ')}</span>` : null}
@@ -53,8 +53,20 @@ function Listings() {
   </div>`;
 }
 
-const TRADE_STATUS = { open: ['En attente', 'var(--warn)'], accepted: ['Acceptée', 'var(--st-trade)'], refused: ['Refusée', 'var(--down)'], cancelled: ['Annulée', 'var(--muted)'], done: ['Conclue', 'var(--up)'] };
+const TRADE_STATUS = { open: ['En attente de réponse', 'var(--warn)'], accepted: ['Acceptée · en cours', 'var(--st-trade)'], received: ['Réception confirmée', 'var(--st-trade)'], refused: ['Refusée', 'var(--down)'], cancelled: ['Annulée', 'var(--muted)'], done: ['Conclue', 'var(--up)'], disputed: ['Litige', 'var(--down)'] };
 function StatusChip({ s }) { const [l, c] = TRADE_STATUS[s] || [s, 'var(--muted)']; return html`<span class="chip" style=${`color:${c};border-color:${c};background:transparent`}>${l}</span>`; }
+function TradeSteps({ t }) {
+  const rec = t.received || {};
+  const steps = [
+    { l: 'Proposée', done: true },
+    { l: 'Acceptée', done: ['accepted', 'done', 'disputed'].includes(t.status) },
+    { l: `Reçu par ${t.a === S.me.id ? 'vous' : displayName(t.a)}`, done: !!rec[t.a] || t.status === 'done' },
+    { l: `Reçu par ${t.b === S.me.id ? 'vous' : displayName(t.b)}`, done: !!rec[t.b] || t.status === 'done' },
+    { l: 'Conclue', done: t.status === 'done' },
+  ];
+  if (['refused', 'cancelled'].includes(t.status)) return null;
+  return html`<ol class="steps">${steps.map(s => html`<li class=${s.done ? 'on' : ''}>${s.l}</li>`)}</ol>`;
+}
 
 function TradesList() {
   const ts = S.trades.filter(t => !blocked()[t.a === S.me.id ? t.b : t.a]);
@@ -76,12 +88,12 @@ function Members() {
   const [f, setF] = useState('');
   const ps = communityPubs();
   useEffect(() => { resolveNames(ps.map(p => p.uid)); }, [ps.length]);
-  const rows = ps.filter(p => !f || norm(displayName(p.uid, p)).includes(norm(f)) || norm(p.region).includes(norm(f))).sort((a, b) => (b.stats || {}).cards - (a.stats || {}).cards);
+  const rows = ps.filter(p => !f || norm(displayName(p.uid, p)).includes(norm(f)) || norm(p.region).includes(norm(f))).sort((a, b) => ((trustOf(b.uid) || {}).done || 0) - ((trustOf(a.uid) || {}).done || 0) || (b.stats || {}).cards - (a.stats || {}).cards);
   return html`<div class="stack">
     <input autocomplete="off" id="mem-f" type="search" placeholder="Rechercher un membre ou une région" value=${f} onInput=${e => setF(e.target.value)} />
     ${rows.length ? html`<div class="grid-2">${rows.map(p => html`<button class="match" key=${p.uid} style="cursor:pointer;text-align:left;color:inherit" onClick=${() => go('user', { uid: p.uid })}>
       <${Avatar} uid=${p.uid} />
-      <div style="min-width:0"><b>${displayName(p.uid, p)}</b><div class="small muted">${p.region || 'Région non précisée'}</div><div class="tiny muted">${p.colPublic ? `${fmtInt((p.stats || {}).cards)} cartes · ` : ''}${(p.stats || {}).wanted || 0} recherchées · ${(p.stats || {}).trade || 0} à l'échange · ${(p.stats || {}).sell || 0} en vente</div></div>
+      <div class="stack s" style="min-width:0"><b>${displayName(p.uid, p)}</b><div class="small muted">${p.region || 'Région non précisée'}</div><${TrustBadge} uid=${p.uid} /><div class="tiny muted">${p.colPublic ? `${fmtInt((p.stats || {}).cards)} cartes · ` : ''}${(p.stats || {}).wanted || 0} recherchées · ${(p.stats || {}).trade || 0} à l'échange · ${(p.stats || {}).sell || 0} en vente</div></div>
       <${Icon} n="right" />
     </button>`)}</div>` : html`<${Empty} title="Aucun membre trouvé">${ps.length ? 'Essayez un autre nom.' : "Aucun autre membre n'a encore de profil public."}<//>`}
   </div>`;
@@ -95,6 +107,7 @@ function TradePage({ id }) {
   const t = S.trades.find(x => x.id === id);
   const [text, setText] = useState('');
   const [price, setPrice] = useState('');
+  const [dispute, setDispute] = useState(null);
   const endRef = useRef(null);
   useEffect(() => { if (t) tradeMarkSeen(t); }, [t && t.upd]);
   useEffect(() => { if (endRef.current) endRef.current.scrollTop = endRef.current.scrollHeight; }, [t && Object.keys(t.msgs || {}).length]);
@@ -104,35 +117,47 @@ function TradePage({ id }) {
   const other = mine ? t.b : t.a;
   const msgs = Object.values(t.msgs || {}).sort((a, b) => a.at - b.at);
   const events = Object.values(t.events || {}).sort((a, b) => a.at - b.at);
+  const iReceived = !!(t.received || {})[S.me.id];
+  const draftRisks = messageRisks(text);
   const send = () => { if (!text.trim()) return; tradeSay(t, text.trim()); setText(''); };
-  const conclude = () => {
-    const p = parseFloat(String(price).replace(',', '.')) || (t.kind === 'buy' ? t.price : 0);
-    tradeSetStatus(t, 'done', p ? { finalPrice: p } : {});
-    if (p > 0 && (t.get || []).length === 1 && !(t.give || []).length) recordSale(t.get[0].c, p, 'NM');
-    toast('Échange marqué comme conclu');
+  const confirm = async () => {
+    const p = parseFloat(String(price).replace(',', '.')) || 0;
+    try { const r = await PF.tradeConfirm(t, p || null); toast(r === 'done' ? 'Échange conclu des deux côtés' : `Réception confirmée · en attente de ${displayName(other)}`); }
+    catch (e) { toast(trustError(e)); }
   };
+  const openDispute = async () => {
+    try { await PF.tradeDispute(t, dispute.trim()); setDispute(null); toast('Litige ouvert : la modération est prévenue'); }
+    catch (e) { toast(trustError(e)); }
+  };
+  const buyRisk = t.kind === 'buy' && (t.get || []).length === 1 ? priceRisk(t.finalPrice || t.price, CAT.byId.get(t.get[0].c), null, 'NM') : null;
   return html`<div class="stack l">
-    <div><${Back} /><div class="spread"><div class="row"><${Avatar} uid=${other} /><div><div class="eyebrow">${mine ? 'Proposition envoyée à' : 'Proposition de'}</div><h2>${displayName(other)}</h2></div></div><div class="row tight"><${StatusChip} s=${t.status} /><span class="tiny muted">${fmtDT(t.at)}</span></div></div></div>
+    <div><${Back} /><div class="spread"><div class="row"><${Avatar} uid=${other} /><div class="stack s"><div class="eyebrow">${mine ? 'Proposition envoyée à' : 'Proposition de'}</div><h2>${displayName(other)}</h2><${TrustBadge} uid=${other} long=${true} /></div></div><div class="row tight"><${StatusChip} s=${t.status} /><span class="tiny muted">${fmtDT(t.at)}</span></div></div></div>
+    <${TradeSteps} t=${t} />
     <div class="grid-2">
       <${TradeLines} title=${mine ? (t.kind === 'buy' ? 'Vous achetez' : 'Vous demandez') : (t.kind === 'buy' ? 'On vous achète' : 'On vous demande')} list=${t.get} />
-      ${t.kind === 'buy' ? html`<div class="panel flat stack s"><div class="eyebrow">Prix proposé</div><span class="num" style="font-size:1.6rem;font-weight:700">${fmtEUR(t.finalPrice || t.price)}</span><p class="small muted">Paiement et envoi à régler entre vous. La plateforme n'intervient pas encore dans les transactions.</p></div>` : html`<${TradeLines} title=${mine ? 'Vous proposez' : 'En échange, vous recevez'} list=${t.give} />`}
+      ${t.kind === 'buy' ? html`<div class="panel flat stack s"><div class="eyebrow">Prix ${t.finalPrice ? 'convenu' : 'proposé'}</div><span class="num" style="font-size:1.6rem;font-weight:700">${fmtEUR(t.finalPrice || t.price)}</span>${buyRisk ? html`<p class=${'small notice' + (buyRisk.level === 'danger' ? ' danger' : buyRisk.level === 'warn' ? ' warn' : '')}>${buyRisk.text}</p>` : null}<p class="small muted">Paiement et envoi se règlent entre vous ; la plateforme n'encaisse rien en version de test.</p></div>` : html`<${TradeLines} title=${mine ? 'Vous proposez' : 'En échange, vous recevez'} list=${t.give} />`}
     </div>
+    <${SafetyPanel} t=${t} />
     <div class="panel stack s">
       <div class="row tight">
         ${t.status === 'open' && !mine ? html`<button class="btn primary" onClick=${() => { tradeSetStatus(t, 'accepted'); toast('Proposition acceptée'); }}><${Icon} n="check" />Accepter</button><button class="btn" onClick=${() => tradeSetStatus(t, 'refused')}>Refuser</button>` : null}
         ${t.status === 'open' && mine ? html`<button class="btn" onClick=${() => tradeSetStatus(t, 'cancelled')}>Annuler ma proposition</button>` : null}
-        ${t.status === 'accepted' ? html`<input autocomplete="off" id="trade-price" type="text" inputmode="decimal" placeholder=${t.kind === 'buy' ? 'Prix final (€)' : 'Soulte éventuelle (€)'} value=${price} onInput=${e => setPrice(e.target.value)} style="width:150px" /><button class="btn primary" onClick=${conclude}><${Icon} n="check" />Marquer comme conclu</button>` : null}
+        ${t.status === 'accepted' && !iReceived ? html`${t.kind === 'buy' ? html`<input autocomplete="off" id="trade-price" type="text" inputmode="decimal" placeholder="Prix final (€)" value=${price} onInput=${e => setPrice(e.target.value)} style="width:140px" />` : null}<button class="btn primary" onClick=${confirm}><${Icon} n="check" />${t.kind === 'buy' ? (mine ? "J'ai reçu la carte" : "J'ai reçu le paiement") : "J'ai reçu les cartes"}</button>` : null}
+        ${t.status === 'accepted' && iReceived ? html`<span class="small">Vous avez confirmé la réception · en attente de ${displayName(other)}</span>` : null}
+        ${['accepted', 'done'].includes(t.status) && dispute === null ? html`<button class="btn danger sm" onClick=${() => setDispute('')}>Signaler un problème</button>` : null}
         <span class="grow"></span>
-        <button class="btn ghost sm" onClick=${() => openModal('report', { target: other, ctx: { trade: t.id } })}><${Icon} n="flag" />Signaler</button>
+        <button class="btn ghost sm" onClick=${() => openModal('report', { target: other, ctx: { trade: t.id } })}><${Icon} n="flag" />Signaler le membre</button>
         <button class="btn ghost sm" onClick=${() => { toggleBlock(other); toast(blocked()[other] ? 'Membre bloqué' : 'Membre débloqué'); if (blocked()[other]) go('market', { tab: 'trades' }); }}><${Icon} n="ban" />${blocked()[other] ? 'Débloquer' : 'Bloquer'}</button>
       </div>
+      ${dispute !== null ? html`<div class="stack s"><label class="field">Que se passe-t-il ?<textarea id="dispute-reason" rows="3" maxlength="500" placeholder="Carte non reçue, différente de l'annonce, paiement absent…" value=${dispute} onInput=${e => setDispute(e.target.value)}></textarea></label><div class="row tight"><button class="btn danger" disabled=${!dispute.trim()} onClick=${openDispute}>Ouvrir un litige</button><button class="btn ghost" onClick=${() => setDispute(null)}>Annuler</button></div></div>` : null}
       <p class="tiny muted">${events.map(e => `${fmtDT(e.at)} · ${(TRADE_STATUS[e.s] || [e.s])[0]} par ${e.by === S.me.id ? 'vous' : displayName(e.by)}`).join('  ·  ')}</p>
     </div>
+    <${ReviewBox} t=${t} />
     <div class="panel stack">
       <h3>Messages</h3>
-      <div class="stack s" ref=${endRef} style="max-height:380px;overflow:auto">${msgs.length ? msgs.map(m => html`<div class=${'thread-msg' + (m.by === S.me.id ? ' mine' : '')}><div>${m.t}</div><div class="tiny muted" style="margin-top:2px">${fmtDT(m.at)}</div></div>`) : html`<p class="small muted">Aucun message.</p>`}</div>
+      <div class="stack s" ref=${endRef} style="max-height:420px;overflow:auto">${msgs.length ? msgs.map(m => { const risks = m.by !== S.me.id ? messageRisks(m.t) : []; return html`<div class=${'thread-msg' + (m.by === S.me.id ? ' mine' : '')}><div>${m.t}</div><div class="tiny muted" style="margin-top:2px">${fmtDT(m.at)}</div></div>${risks.length ? html`<div class="msg-risk">⚠ ${risks.join(' ')}</div>` : null}`; }) : html`<p class="small muted">Aucun message.</p>`}</div>
       ${t.status !== 'cancelled' && t.status !== 'refused' ? html`<form class="row tight" style="flex-wrap:nowrap" onSubmit=${e => { e.preventDefault(); send(); }}><input autocomplete="off" id="trade-say" type="text" class="grow" maxlength="1000" placeholder="Votre message…" value=${text} onInput=${e => setText(e.target.value)} /><button class="btn primary" type="submit" disabled=${!text.trim()}><${Icon} n="send" />Envoyer</button></form>` : null}
-      <p class="tiny muted">Ne partagez ni adresse complète ni coordonnées bancaires. Préférez la remise en main propre ou un envoi suivi.</p>
+      ${draftRisks.length ? html`<p class="msg-risk">⚠ ${draftRisks[0]}</p>` : html`<p class="tiny muted">Ne partagez ni adresse complète ni coordonnées bancaires avant d'avoir vérifié le membre. Préférez la remise en main propre ou un envoi suivi.</p>`}
     </div>
   </div>`;
 }
@@ -153,7 +178,7 @@ function UserPage({ uid }) {
   const forMe = Object.keys(p.trade || {}).concat(Object.keys(p.sell || {})).filter(id => myWant[id]);
   return html`<div class="stack l">
     <div><${Back} />
-      <div class="spread"><div class="row"><${Avatar} uid=${uid} size="lg" /><div class="stack s"><h1>${displayName(uid, p)}</h1><span class="muted small">${p.region || 'Région non précisée'} · Réputation : à venir avec la marketplace</span>${p.bio ? html`<p class="small" style="max-width:60ch">${p.bio}</p>` : null}</div></div>
+      <div class="spread"><div class="row"><${Avatar} uid=${uid} size="lg" /><div class="stack s"><h1>${displayName(uid, p)}</h1><span class="muted small">${p.region || 'Région non précisée'}</span><${TrustBadge} uid=${uid} long=${true} />${p.bio ? html`<p class="small" style="max-width:60ch">${p.bio}</p>` : null}</div></div>
         <div class="row"><button class="btn primary" onClick=${() => openModal('trade', { to: uid, wantIds: forMe })}><${Icon} n="swap" />Proposer un échange</button><button class="btn ghost sm" onClick=${() => openModal('report', { target: uid, ctx: { profile: uid } })}><${Icon} n="flag" />Signaler</button><button class="btn ghost sm" onClick=${() => { toggleBlock(uid); toast(blocked()[uid] ? 'Membre bloqué' : 'Membre débloqué'); }}><${Icon} n="ban" />${blocked()[uid] ? 'Débloquer' : 'Bloquer'}</button></div>
       </div>
     </div>

@@ -16,6 +16,8 @@ const S = {
   overrides: {},
   catalogLog: {},
   reports: [],
+  trust: {},                  // uid -> { since, done, disputes, pos, neu, neg }
+  myReviews: new Set(),       // trade ids I already reviewed
   toast: null,
   catError: null,
 };
@@ -204,7 +206,8 @@ function buildPub() {
   const trade = {}, sell = {};
   for (const it of allItems()) {
     if (it.tq > 0 && p.tradeOn) trade[it.c] = [(trade[it.c] ? trade[it.c][0] : 0) + it.tq, it.k, it.g, it.v];
-    if (it.sq > 0 && p.sellOn) sell[it.c] = [(sell[it.c] ? sell[it.c][0] : 0) + it.sq, it.k, it.g, it.sp || 0, it.v];
+    // a listing at or above PROOF_MIN_PRICE is only published with a real photo
+    if (it.sq > 0 && p.sellOn && (!(it.sp >= 30) || (it.proof && it.proof.p))) sell[it.c] = [(sell[it.c] ? sell[it.c][0] : 0) + it.sq, it.k, it.g, it.sp || 0, it.v, it.proof || null];
   }
   const want = {};
   if (p.wishPublic) for (const [id, w] of Object.entries(wishItems())) want[id] = w.mx || 0;
@@ -291,7 +294,7 @@ function whoHas(cardId) {
 function availability(cardId) { let n = 0; for (const p of communityPubs()) if ((p.trade && p.trade[cardId]) || (p.sell && p.sell[cardId])) n++; return n; }
 function listings() {
   const out = [];
-  for (const p of communityPubs()) for (const [id, d] of Object.entries(p.sell || {})) { const c = CAT.byId.get(id); if (c) out.push({ c, uid: p.uid, pub: p, q: d[0], k: d[1], g: d[2], price: d[3], v: d[4] }); }
+  for (const p of communityPubs()) for (const [id, d] of Object.entries(p.sell || {})) { const c = CAT.byId.get(id); if (c) out.push({ c, uid: p.uid, pub: p, q: d[0], k: d[1], g: d[2], price: d[3], v: d[4], proof: d[5] || null }); }
   return out;
 }
 

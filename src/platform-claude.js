@@ -26,6 +26,8 @@ const PF = {
   tradeSay(t, text) { const now = Date.now(); return S.db.doc('trades/' + t.id).update({ msgs: { [newId()]: { by: S.me.id, t: text, at: now } }, upd: now, lastBy: S.me.id, seen: { [S.me.id]: now } }); },
   tradeStatus(t, s, extra) { const now = Date.now(); return S.db.doc('trades/' + t.id).update({ status: s, events: { [newId()]: { by: S.me.id, s, at: now } }, ...extra, upd: now, lastBy: S.me.id, seen: { [S.me.id]: now } }); },
   tradeSeen: t => S.db.doc('trades/' + t.id).update({ seen: { [S.me.id]: Date.now() } }),
+  tradeConfirm(t, finalPrice) { const now = Date.now(); const rec = { ...(t.received || {}), [S.me.id]: now }; const both = rec[t.a] && rec[t.b]; return S.db.doc('trades/' + t.id).update({ received: { [S.me.id]: now }, ...(both ? { status: 'done' } : {}), ...(finalPrice ? { finalPrice } : {}), events: { [newId()]: { by: S.me.id, s: both ? 'done' : 'received', at: now } }, upd: now, lastBy: S.me.id, seen: { [S.me.id]: now } }).then(() => both ? 'done' : 'waiting'); },
+  tradeDispute(t, reason) { const now = Date.now(); return S.db.doc('trades/' + t.id).update({ status: 'disputed', events: { [newId()]: { by: S.me.id, s: 'disputed', at: now, t: reason } }, upd: now, lastBy: S.me.id }).then(() => PF.report(t.a === S.me.id ? t.b : t.a, 'Litige : ' + reason, { trade: t.id, dispute: true })); },
   async recordSale(cardId, p, k) {
     const ref = S.db.doc('sales/' + cardId); const entry = { [newId()]: { p, k, at: Date.now() } };
     const snap = await ref.get();
