@@ -1,11 +1,13 @@
 /* ============================================================
    Cartothèque — scanner, collection, binders
    ============================================================ */
-const SCAN = { items: [], tier: 'quick', busy: false, disabled: false };
+// engine: 'free' = on-device recognition (visual.js, unlimited, works offline); 'ai' = optional paid vision model
+const SCAN = { items: [], tier: 'quick', engine: null, busy: false, disabled: false };
+const scanEngine = () => SCAN.engine || (PF.freeScan ? 'free' : 'ai');
 const SCAN_ERRORS = {
   not_granted: "L'accès à la reconnaissance a été refusé pour cette page : elle est désactivée pendant cette visite. Utilisez la saisie rapide ci-dessous.",
-  not_configured: "La reconnaissance photo n'est pas encore activée sur le serveur (clé API à ajouter). Utilisez la saisie rapide ci-dessous.",
-  quota: 'Vous avez atteint votre quota de scans du mois. La saisie rapide reste disponible.',
+  not_configured: "La lecture IA n'est pas activée sur le serveur (clé API à ajouter). Le scanner gratuit reste disponible.",
+  quota: 'Vous avez atteint votre quota de lectures IA du mois. Le scanner gratuit reste disponible.',
   auth: 'Votre session a expiré. Reconnectez-vous puis relancez cette photo.',
   too_large: 'Cette photo est trop lourde. Réessayez avec une photo plus petite.',
   sampling_disabled: "La reconnaissance n'est pas disponible pour votre compte. Utilisez la saisie rapide ci-dessous.",
@@ -16,39 +18,50 @@ const SCAN_ERRORS = {
   refused: "Cette photo n'a pas pu être analysée. Essayez une autre prise de vue.",
   empty_completion: "Aucune carte n'a été lue sur cette photo. Rapprochez-vous et évitez les reflets.",
   session_expired: 'Votre session a expiré. Reconnectez-vous puis relancez.',
+  free_index: "Le scanner gratuit n'a pas pu charger ses données. Vérifiez votre connexion puis relancez.",
 };
+// files: File/Blob, or { blob, hint } where hint is the guide-frame rectangle as fractions of the photo
 function queueScans(files) {
-  for (const f of files) SCAN.items.unshift({ id: newId(), url: URL.createObjectURL(f), file: f, status: 'pending', tier: SCAN.tier, dets: [], sealed: [], note: '' });
+  for (const f of files) {
+    const blob = f instanceof Blob ? f : f.blob;
+    SCAN.items.unshift({ id: newId(), url: URL.createObjectURL(blob), file: blob, hint: f instanceof Blob ? null : f.hint || null, status: 'pending', tier: SCAN.tier, engine: scanEngine(), dets: [], sealed: [], note: '' });
+  }
   emit();
   runScans();
 }
+const toDetection = (det, m, extra = {}) => ({ id: newId(), det, m, choice: m.ambiguous ? null : (m.best && m.best.id), vi: m.vi, k: 'NM', g: 'fr', q: 1, state: 'todo', gr: '', ...extra });
 async function runScans() {
   if (SCAN.busy) return;
   SCAN.busy = true;
   for (;;) {
     const it = [...SCAN.items].reverse().find(x => x.status === 'pending');
     if (!it) break;
-    it.status = 'running'; it.t0 = performance.now(); emit();
+    it.status = 'running'; it.step = ''; it.t0 = performance.now(); emit();
     try {
-      const blob = await prepareImage(it.file);
-      const res = await PF.scan(blob, it.tier === 'default');
-      const cards = Array.isArray(res && res.cards) ? res.cards : [];
-      it.dets = cards.slice(0, 12).map(d => {
-        const m = matchDetection(d || {});
-        return {
-          id: newId(), det: d || {}, m, choice: m.ambiguous ? null : (m.best && m.best.id), vi: m.vi,
-          k: CONDS.some(x => x.k === d.condition) ? d.condition : 'NM', g: LANGS.some(l => l.k === d.language) ? d.language : 'fr', q: 1, state: 'todo',
+      if (it.engine === 'free') {
+        let res;
+        try { res = await freeScan(it.file, it.hint, step => { it.step = step; emit(); }); }
+        catch (e) { throw (e && e.code) ? e : { code: /visual|fetch|network/i.test(String(e && e.message)) ? 'free_index' : 'upstream_error' }; }
+        it.dets = res.dets.map(x => toDetection(x.det, x.m));
+        it.sealed = []; it.note = '';
+        it.status = 'done'; it.ms = res.ms;
+      } else {
+        const blob = await prepareImage(it.file);
+        const res = await PF.scan(blob, it.tier === 'default');
+        const cards = Array.isArray(res && res.cards) ? res.cards : [];
+        it.dets = cards.slice(0, 12).map(d => toDetection(d || {}, matchDetection(d || {}), {
+          k: CONDS.some(x => x.k === d.condition) ? d.condition : 'NM', g: LANGS.some(l => l.k === d.language) ? d.language : 'fr',
           gr: d.graded && d.graded.company ? `${d.graded.company} ${d.graded.grade || ''}`.trim() : '',
-        };
-      });
-      it.sealed = Array.isArray(res && res.sealed) ? res.sealed : [];
-      it.note = (res && res.note) || '';
-      it.status = 'done'; it.ms = performance.now() - it.t0;
-      countScan();
+        }));
+        it.sealed = Array.isArray(res && res.sealed) ? res.sealed : [];
+        it.note = (res && res.note) || '';
+        it.status = 'done'; it.ms = performance.now() - it.t0;
+        countScan();
+      }
     } catch (e) {
       it.status = 'error';
       it.error = SCAN_ERRORS[e && e.code] || 'Le module de reconnaissance ne répond pas. Relancez cette photo dans un instant.';
-      if (e && ['not_granted', 'sampling_disabled', 'images_unavailable', 'not_configured'].includes(e.code)) SCAN.disabled = true;
+      if (it.engine === 'ai' && e && ['not_granted', 'sampling_disabled', 'images_unavailable', 'not_configured'].includes(e.code)) { SCAN.disabled = true; SCAN.engine = PF.freeScan ? 'free' : null; }
     }
     emit();
   }
@@ -65,10 +78,13 @@ function addDetection(d) {
 function ScanPage() {
   const cam = useRef(null), lib = useRef(null);
   const [quick, setQuick] = useState('');
+  useEffect(() => { if (PF.freeScan) { loadVisualIndex().catch(() => {}); tessWorker().catch(() => {}); } }, []);
   const canAI = PF.canScan() && !SCAN.disabled;
+  const engine = scanEngine();
+  const canShoot = engine === 'free' || canAI;
   const used = scansThisMonth();
   const quota = S.config.scanQuota || 20;
-  const blocked = S.config.enforceQuota && used >= quota;
+  const blocked = engine === 'ai' && S.config.enforceQuota && used >= quota;
   const allDets = SCAN.items.flatMap(it => it.dets);
   const ready = allDets.filter(d => d.choice && d.state === 'todo');
   const quickRes = useMemo(() => quick.trim().length >= 2 ? searchCards(quick).slice(0, 12) : [], [quick]);
@@ -76,10 +92,12 @@ function ScanPage() {
   return html`<div class="stack l">
     <section class="scan-hero">
       <div class="stack">
-        <div class="eyebrow" style="color:color-mix(in srgb,var(--paper) 65%,transparent)">Scanner</div>
+        <div class="eyebrow" style="color:color-mix(in srgb,var(--paper) 65%,transparent)">Scanner${engine === 'free' ? ' · gratuit et illimité' : ''}</div>
         <h1 style="color:var(--paper)">Photographiez, on s'occupe du reste</h1>
-        <p style="opacity:.8;max-width:52ch">Une carte, plusieurs cartes étalées ou une page de classeur entière : chaque carte est identifiée (nom, extension, numéro, variante, état apparent) puis rapprochée du catalogue avec un indice de confiance.</p>
-        ${canAI ? html`<div class="row">
+        <p style="opacity:.8;max-width:52ch">${engine === 'free'
+          ? "Cadrez une carte dans le viseur : son illustration est comparée aux 17 000 cartes du catalogue et son numéro imprimé est lu, directement sur votre appareil. Rien n'est envoyé, rien n'est facturé."
+          : 'Une carte, plusieurs cartes étalées ou une page de classeur entière : chaque carte est identifiée (nom, extension, numéro, variante, état apparent) puis rapprochée du catalogue avec un indice de confiance.'}</p>
+        ${canShoot ? html`<div class="row">
           ${PF.camera ? html`<button class="btn scan" disabled=${blocked} onClick=${() => openModal('camera')}><${Icon} n="scan" />Ouvrir le scanner</button>` : null}
           <button class=${'btn ' + (PF.camera ? 'alt' : 'scan')} disabled=${blocked} onClick=${() => cam.current && cam.current.click()}><${Icon} n="camera" />${PF.camera ? 'Appareil photo' : 'Prendre une photo'}</button>
           <button class="btn alt" disabled=${blocked} onClick=${() => lib.current && lib.current.click()}><${Icon} n="image" />Importer des photos</button>
@@ -87,10 +105,10 @@ function ScanPage() {
           <input ref=${lib} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange=${pick} />
         </div>
         <div class="row small" style="opacity:.85">
-          <label class="switch" style="color:var(--paper)"><input id="scan-precise" type="checkbox" checked=${SCAN.tier === 'default'} onChange=${e => { SCAN.tier = e.target.checked ? 'default' : 'quick'; emit(); }} />Lecture précise (plus lente)</label>
-          <span class="num">Scans ce mois-ci : ${used}${S.config.enforceQuota ? ' / ' + quota : ''}</span>
+          ${PF.freeScan && canAI ? html`<label class="switch" style="color:var(--paper)"><input id="scan-ai" type="checkbox" checked=${engine === 'ai'} onChange=${e => { SCAN.engine = e.target.checked ? 'ai' : 'free'; emit(); }} />Lecture IA (pages de classeur, cartes difficiles)</label>` : null}
+          ${engine === 'ai' ? html`<label class="switch" style="color:var(--paper)"><input id="scan-precise" type="checkbox" checked=${SCAN.tier === 'default'} onChange=${e => { SCAN.tier = e.target.checked ? 'default' : 'quick'; emit(); }} />Lecture précise (plus lente)</label><span class="num">Lectures IA ce mois-ci : ${used}${S.config.enforceQuota ? ' / ' + quota : ''}</span>` : null}
         </div>
-        ${blocked ? html`<p class="notice warn">Vous avez utilisé vos ${quota} scans gratuits ce mois-ci. Les scans illimités feront partie de l'offre Premium ; en attendant, la saisie rapide reste disponible.</p>` : null}`
+        ${blocked ? html`<p class="notice warn">Vous avez utilisé vos ${quota} lectures IA ce mois-ci. Le scanner gratuit reste disponible : décochez « Lecture IA ».</p>` : null}`
         : html`<div class="notice warn stack s"><span>${S.mode === 'local' ? PF.text.scanLocal : SCAN.disabled ? (SCAN.reason || 'La reconnaissance photo est désactivée pour cette visite. Utilisez la saisie rapide ci-dessous.') : 'Connexion au module de reconnaissance…'}</span>${S.mode === 'local' && PF.LoginButton ? html`<${PF.LoginButton} />` : null}</div>`}
       </div>
       <div class="scan-frame" aria-hidden="true"><i></i><i></i><i></i><i></i><span class="line"></span></div>
@@ -111,7 +129,9 @@ function ScanPage() {
         </div>
       </div>
       ${SCAN.items.map(it => html`<${ScanItem} key=${it.id} it=${it} />`)}
-    </section>` : html`<${Empty} title="Aucun scan pour l'instant">Conseil : posez la carte sur un fond uni, sans reflet, et cadrez le numéro en bas à gauche. Pour aller vite, photographiez une page de classeur 3 × 3 : jusqu'à 9 cartes reconnues d'un coup.<//>`}
+    </section>` : html`<${Empty} title="Aucun scan pour l'instant">${engine === 'free'
+      ? 'Conseil : posez la carte à plat sur un fond uni, sans reflet, et faites-la remplir le cadre du viseur. Une carte par photo ; enchaînez les photos sans quitter le viseur.'
+      : "Conseil : posez la carte sur un fond uni, sans reflet, et cadrez le numéro en bas à gauche. Pour aller vite, photographiez une page de classeur 3 × 3 : jusqu'à 9 cartes reconnues d'un coup."}<//>`}
   </div>`;
 }
 
@@ -120,11 +140,12 @@ function ScanItem({ it }) {
     <img class="ph" src=${it.url} alt="Photo scannée" />
     <div class="stack s" style="min-width:0">
       ${it.status === 'pending' ? html`<p class="small muted">En attente…</p>` : null}
-      ${it.status === 'running' ? html`<div class="row"><div class="spinner" style="width:20px;height:20px;border-width:2px"></div><span class="small">Identification en cours${it.tier === 'default' ? ' (lecture précise)' : ''}…</span></div>` : null}
-      ${it.status === 'error' ? html`<div class="stack s"><p class="small" style="color:var(--down)">${it.error}</p>${!SCAN.disabled ? html`<button class="btn sm" style="align-self:flex-start" onClick=${() => { it.status = 'pending'; emit(); runScans(); }}>Relancer</button>` : null}</div>` : null}
+      ${it.status === 'running' ? html`<div class="row"><div class="spinner" style="width:20px;height:20px;border-width:2px"></div><span class="small">${it.step || ('Identification en cours' + (it.tier === 'default' && it.engine === 'ai' ? ' (lecture précise)' : '') + '…')}</span></div>` : null}
+      ${it.status === 'error' ? html`<div class="stack s"><p class="small" style="color:var(--down)">${it.error}</p><button class="btn sm" style="align-self:flex-start" onClick=${() => { it.engine = scanEngine(); it.status = 'pending'; emit(); runScans(); }}>Relancer</button></div>` : null}
       ${it.status === 'done' ? html`<div class="stack s">
-        <div class="spread"><span class="small"><b>${plural(it.dets.length, 'carte détectée', 'cartes détectées')}</b> en ${(it.ms / 1000).toFixed(1).replace('.', ',')} s${it.note ? html` · <span class="muted">${it.note}</span>` : null}</span>
-          ${it.tier !== 'default' ? html`<button class="btn ghost sm" onClick=${() => { it.tier = 'default'; it.status = 'pending'; it.dets = []; emit(); runScans(); }}>Relancer en lecture précise</button>` : null}</div>
+        <div class="spread"><span class="small"><b>${it.engine === 'free' ? 'Analysée' : plural(it.dets.length, 'carte détectée', 'cartes détectées')}</b> en ${(it.ms / 1000).toFixed(1).replace('.', ',')} s${it.note ? html` · <span class="muted">${it.note}</span>` : null}</span>
+          ${it.engine === 'free' && PF.canScan() && !SCAN.disabled ? html`<button class="btn ghost sm" onClick=${() => { it.engine = 'ai'; it.status = 'pending'; it.dets = []; emit(); runScans(); }}>Relancer avec l'IA</button>` : null}
+          ${it.engine === 'ai' && it.tier !== 'default' ? html`<button class="btn ghost sm" onClick=${() => { it.tier = 'default'; it.status = 'pending'; it.dets = []; emit(); runScans(); }}>Relancer en lecture précise</button>` : null}</div>
         ${it.dets.map(d => html`<${Detection} key=${d.id} d=${d} />`)}
         ${it.sealed.length ? html`<div class="notice small">Produit scellé repéré : ${it.sealed.map(s => `${s.name || s.type}${s.set ? ' (' + s.set + ')' : ''}`).join(', ')}. <button class="btn sm" onClick=${() => go('collection', { tab: 'sealed' })}>L'ajouter à mes scellés</button></div>` : null}
         ${!it.dets.length && !it.sealed.length ? html`<p class="small muted">Aucune carte lisible. Essayez plus près, sans reflet, ou passez par la saisie rapide.</p>` : null}
@@ -136,7 +157,9 @@ function ScanItem({ it }) {
 function Detection({ d }) {
   const c = d.choice ? CAT.byId.get(d.choice) : null;
   const det = d.det;
-  const read = [det.printedName, det.number ? det.number + (det.total ? '/' + det.total : '') : null, det.setCode].filter(Boolean).join(' · ');
+  const read = det.source === 'free'
+    ? (det.number ? `son illustration et son numéro ${det.number}${det.total ? '/' + det.total : ''}` : det.ocrUsed ? 'son illustration (numéro illisible)' : 'son illustration')
+    : [det.printedName, det.number ? det.number + (det.total ? '/' + det.total : '') : null, det.setCode].filter(Boolean).join(' · ');
   if (d.state === 'added') return html`<div class="det" style="grid-template-columns:40px minmax(0,1fr)"><${MiniTile} c=${c} vi=${d.vi} w=${40} /><div class="row"><span class="pip own">✓</span><span class="small"><b>${cardName(c)}</b> ajoutée (${d.k}, ${langS(d.g)}${d.q > 1 ? ', ×' + d.q : ''})</span></div></div>`;
   if (d.state === 'skipped') return html`<div class="small muted">Ignorée : ${read}</div>`;
   if (!c) return html`<div class="det" style="grid-template-columns:minmax(0,1fr)"><div class="stack s">
@@ -150,7 +173,8 @@ function Detection({ d }) {
     <${MiniTile} c=${c} vi=${d.vi} w=${64} />
     <div class="stack s" style="min-width:0">
       <div class="spread"><span><b>${cardName(c)}</b> <span class="small muted">${c.set.n} · ${numLabel(c)}</span></span><span class="num">${fmtEUR(price)}</span></div>
-      <span class="tiny"><span class="conf-dot" style=${`background:${confColor(d.m.conf)}`}></span>Confiance identification : ${d.m.conf} %${d.m.ambiguous ? ' · choisie manuellement' : ''}${d.gr ? ' · gradée ' + d.gr : ''}</span>
+      <span class="tiny"><span class="conf-dot" style=${`background:${confColor(d.m.conf)}`}></span>Confiance identification : ${d.m.conf} %${d.m.ambiguous ? ' · choisie manuellement' : ''}${d.gr ? ' · gradée ' + d.gr : ''}${det.source === 'free' ? ' · reconnue par ' + read : ''}</span>
+      ${det.source === 'free' && d.m.candidates.length > 1 && d.m.conf < 85 ? html`<div class="row tight"><span class="tiny muted">Ou :</span>${d.m.candidates.filter(x => x.id !== c.id).slice(0, 3).map(x => html`<button class="chip" onClick=${() => { d.choice = x.id; d.vi = x.mv; emit(); }}>${cardName(x)} · ${x.set.a || x.set.n} ${numLabel(x)}</button>`)}</div>` : null}
       <div class="row tight">
         ${c.v.length > 1 ? html`<select aria-label="Variante" value=${d.vi} onChange=${e => { d.vi = +e.target.value; emit(); }}>${c.v.map((x, i) => html`<option value=${i}>${x.l}</option>`)}</select>` : null}
         <select aria-label="État" value=${d.k} onChange=${e => { d.k = e.target.value; emit(); }}>${CONDS.map(x => html`<option value=${x.k}>${x.k} · ${x.l}</option>`)}</select>

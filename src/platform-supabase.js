@@ -19,6 +19,7 @@ function sbFail(error) { if (error) throw error; }
 
 const PF = {
   camera: true,
+  freeScan: true,
   text: {
     chip: 'Invité',
     local: 'Mode invité : votre collection reste sur ce téléphone. Créez un compte gratuit pour la sauvegarder, la retrouver partout et accéder aux échanges.',
@@ -309,7 +310,7 @@ PF.AccountPanel = AccountPanel;
 
 // ---------- live camera scanner ----------
 function CameraModal() {
-  const vid = useRef(null);
+  const vid = useRef(null), frameRef = useRef(null);
   const [err, setErr] = useState('');
   const [n, setN] = useState(0);
   const [flash, setFlash] = useState(false);
@@ -332,17 +333,25 @@ function CameraModal() {
     if (!v || !v.videoWidth) return;
     const cv = document.createElement('canvas'); cv.width = v.videoWidth; cv.height = v.videoHeight;
     cv.getContext('2d').drawImage(v, 0, 0);
-    const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.9));
+    const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.92));
     if (!blob) return;
-    queueScans([blob]);
+    // guide frame in video pixels (the video is shown with object-fit: cover)
+    let hint = null;
+    const fr = frameRef.current && frameRef.current.getBoundingClientRect(), vr = v.getBoundingClientRect();
+    if (fr && vr.width) {
+      const s = Math.max(vr.width / v.videoWidth, vr.height / v.videoHeight);
+      const ox = vr.left + (vr.width - v.videoWidth * s) / 2, oy = vr.top + (vr.height - v.videoHeight * s) / 2;
+      hint = { x: (fr.left - ox) / s / v.videoWidth, y: (fr.top - oy) / s / v.videoHeight, w: fr.width / s / v.videoWidth, h: fr.height / s / v.videoHeight };
+    }
+    queueScans([{ blob, hint }]);
     setN(x => x + 1); setFlash(true); setTimeout(() => setFlash(false), 140);
     try { if (navigator.vibrate) navigator.vibrate(30); } catch (e) { /* no vibration */ }
   };
   return html`<div class="cam" role="dialog" aria-modal="true" aria-label="Scanner">
     <video ref=${vid} class="cam-video" playsinline muted autoplay></video>
-    <div class="cam-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <div class="cam-frame" ref=${frameRef} aria-hidden="true"><i></i><i></i><i></i><i></i></div>
     ${flash ? html`<div class="cam-flash"></div>` : null}
-    <div class="cam-top"><span>${n ? `${n} photo${n > 1 ? 's' : ''} en cours d'identification` : 'Cadrez une carte ou une page de classeur'}</span><button class="icon-btn" aria-label="Fermer le scanner" onClick=${closeModal}><${Icon} n="x" /></button></div>
+    <div class="cam-top"><span>${n ? `${n} photo${n > 1 ? 's' : ''} en cours d'identification` : (scanEngine() === 'free' ? 'Faites remplir le cadre par la carte' : 'Cadrez une carte ou une page de classeur')}</span><button class="icon-btn" aria-label="Fermer le scanner" onClick=${closeModal}><${Icon} n="x" /></button></div>
     ${err ? html`<p class="cam-err">${err}</p>` : null}
     <div class="cam-bar"><button class="btn" onClick=${closeModal}>${n ? 'Voir les résultats' : 'Fermer'}</button><button class="cam-shutter" aria-label="Prendre la photo" disabled=${!!err} onClick=${shoot}></button><span class="count">${n ? '×' + n : ''}</span></div>
   </div>`;

@@ -17,7 +17,8 @@ def read(name):
         return f.read()
 
 platform = "platform-claude.js" if TARGET == "artifact" else "platform-supabase.js"
-js = "\n".join(read(f) for f in ["core.js", "store.js", platform, "components.js", "pages1.js", "pages2.js", "pages3.js"])
+modules = ["core.js", "store.js", platform] + (["visual.js"] if TARGET == "web" else []) + ["components.js", "pages1.js", "pages2.js", "pages3.js"]
+js = "\n".join(read(f) for f in modules)
 css = read("style.css")
 
 if TARGET == "artifact":
@@ -148,7 +149,7 @@ self.addEventListener('fetch', e => {
     return;
   }
   if (url.hostname === 'assets.tcgdex.net') { e.respondWith(cacheFirst(IMAGES, req)); return; }
-  if (url.hostname === 'cdn.jsdelivr.net' || url.hostname.endsWith('gstatic.com') || url.hostname.endsWith('googleapis.com')) { e.respondWith(cacheFirst(SHELL, req)); }
+  if (url.hostname === 'cdn.jsdelivr.net' || url.hostname.endsWith('gstatic.com') || url.hostname.endsWith('googleapis.com')) { e.respondWith(cacheFirst('cdn-v1', req)); }
 });
 """.replace("__VERSION__", version)
 open(os.path.join(OUT, "sw.js"), "w", encoding="utf-8").write(sw)

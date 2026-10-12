@@ -7,3 +7,5 @@ mobile/node_modules/
 mobile/android/
 __pycache__/
 *.pyc
+public/_test/
+vcache/
