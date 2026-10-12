@@ -550,3 +550,7 @@ main.nav-back > * { animation: fade-in .18s ease-out; }
   .filters .desk-only { display: none; }
   .filters.open { animation: fade-in .2s ease-out; }
 }
+.phone-inline { display: none !important; }
+@media (max-width: 760px) { .phone-inline { display: inline-flex !important; } .filters .seg { flex: 1 1 100%; justify-content: center; } }
+/* three cards per row on phones: name on its own line, price under it (both were cut to « Drac… ») */
+@media (max-width: 480px) { .grid-cards .ccell .meta { flex-direction: column; align-items: flex-start; gap: 0; } .grid-cards .ccell .meta .nm { max-width: 100%; } }

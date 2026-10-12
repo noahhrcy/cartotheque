@@ -124,7 +124,7 @@ function ScanPage() {
       <div class="spread">
         <h2>Cette session · ${plural(allDets.length, 'carte détectée', 'cartes détectées')}</h2>
         <div class="row">
-          ${ready.length > 1 ? html`<button class="btn primary" onClick=${() => { const n = ready.length; ready.forEach(addDetection); toast(`${n} cartes ajoutées à votre collection`); }}><${Icon} n="check" />Ajouter les ${ready.length} à ma collection</button>` : null}
+          ${ready.length > 1 ? html`<button class="btn primary" onClick=${() => { const n = ready.length; ready.forEach(addDetection); haptic('success'); toast(`${n} cartes ajoutées à votre collection`); }}><${Icon} n="check" />Ajouter les ${ready.length} à ma collection</button>` : null}
           <button class="btn ghost sm" onClick=${() => { SCAN.items.forEach(i => URL.revokeObjectURL(i.url)); SCAN.items = []; emit(); }}>Vider</button>
         </div>
       </div>
@@ -182,7 +182,7 @@ function Detection({ d }) {
         <${Stepper} value=${d.q} min=${1} onChange=${n => { d.q = n; emit(); }} />
       </div>
       <div class="row tight">
-        <button class="btn primary sm" onClick=${() => { addDetection(d); toast(`${cardName(c)} ajoutée`); }}><${Icon} n="plus" />Ajouter</button>
+        <button class="btn primary sm" onClick=${() => { addDetection(d); haptic('success'); toast(`${cardName(c)} ajoutée`); }}><${Icon} n="plus" />Ajouter</button>
         <button class="btn sm" onClick=${() => openModal('picker', { title: 'Corriger la carte', onPick: x => { d.choice = x.id; d.vi = x.mv; emit(); } })}>Modifier</button>
         <button class="btn ghost sm" onClick=${() => go('card', { id: c.id })}>Voir la cote</button>
         <button class="btn ghost sm" onClick=${() => { d.state = 'skipped'; emit(); }}>Ignorer</button>
@@ -193,7 +193,7 @@ function Detection({ d }) {
 
 // ---------- collection ----------
 function CollectionPage({ tab: tab0 }) {
-  const [tab, setTab] = useState(tab0 || 'cards');
+  const [tab, setTab] = useRouteState('tab', tab0 || 'cards');
   const st = colStats();
   const tabs = [['cards', 'Cartes'], ['binders', 'Classeurs'], ['wish', 'Recherches'], ['doubles', 'Doublons'], ['sealed', 'Scellés']];
   return html`<div class="stack l">
@@ -215,14 +215,16 @@ function CollectionPage({ tab: tab0 }) {
 }
 
 function ColCards() {
-  const [f, setF] = useState('');
-  const [setIdx, setSetIdx] = useState('');
-  const [lang, setLang] = useState('');
-  const [cond, setCond] = useState('');
-  const [status, setStatus] = useState('');
-  const [sort, setSort] = useState('value');
+  const [f, setF] = useRouteState('f', '');
+  const [setIdx, setSetIdx] = useRouteState('set', '');
+  const [lang, setLang] = useRouteState('lang', '');
+  const [cond, setCond] = useRouteState('cond', '');
+  const [status, setStatus] = useRouteState('status', '');
+  const [sort, setSort] = useRouteState('sort', 'value');
   const [view, setView] = useState(lsGet('colView', 'grid'));
-  const [n, setN] = useState(90);
+  const [n, setN] = useRouteState('n', 90);
+  const [showF, setShowF] = useRouteState('filters', false);
+  const nF = [setIdx, lang, cond, status].filter(x => x !== '').length;
   const items = allItems();
   if (!items.length) return html`<${Empty} title="Aucune carte pour l'instant" action=${html`<div class="row" style="justify-content:center"><button class="btn primary" onClick=${() => go('scan')}>Scanner une carte</button><button class="btn" onClick=${() => go('cards')}>Chercher dans le catalogue</button></div>`}>Chaque carte ajoutée garde sa variante, sa langue, son état et sa quantité. La valeur se calcule à partir de la cote du jour.<//>`;
   const om = owned();
@@ -242,8 +244,11 @@ function ColCards() {
   rows.sort((a, b) => sort === 'value' ? b.val - a.val : sort === 'recent' ? (b.it.at || 0) - (a.it.at || 0) : sort === 'name' ? cardName(a.c).localeCompare(cardName(b.c), 'fr') : (b.c.set.d || '').localeCompare(a.c.set.d || '') || a.c.k - b.c.k);
   const setOpts = [...new Set(items.map(it => CAT.byId.get(it.c).si))].map(i => CAT.sets[i]).sort((a, b) => (b.d || '').localeCompare(a.d || ''));
   return html`<div class="stack">
-    <div class="row tight">
-      <input autocomplete="off" id="col-f" type="search" placeholder="Filtrer par nom ou numéro" value=${f} onInput=${e => setF(e.target.value)} style="flex:1;min-width:160px" />
+    <div class="row tight" style="flex-wrap:nowrap">
+      <input autocomplete="off" id="col-f" type="search" enterkeyhint="search" placeholder="Filtrer par nom ou numéro" value=${f} onInput=${e => setF(e.target.value)} style="flex:1;min-width:0" />
+      <button class=${'btn sm phone-inline' + (nF ? ' primary' : '')} aria-expanded=${String(showF)} aria-controls="col-filters" onClick=${() => setShowF(!showF)}><${Icon} n="layers" />Filtres${nF ? ` (${nF})` : ''}</button>
+    </div>
+    <div id="col-filters" class=${'row tight filters' + (showF ? ' open' : '')}>
       <select id="col-set" aria-label="Extension" value=${setIdx} onChange=${e => setSetIdx(e.target.value)}><option value="">Toutes les extensions</option>${setOpts.map(s => html`<option value=${s.i}>${s.n}</option>`)}</select>
       <select id="col-lang" aria-label="Langue" value=${lang} onChange=${e => setLang(e.target.value)}><option value="">Toutes langues</option>${LANGS.map(l => html`<option value=${l.k}>${l.l}</option>`)}</select>
       <select id="col-cond" aria-label="État" value=${cond} onChange=${e => setCond(e.target.value)}><option value="">Tous états</option>${CONDS.map(x => html`<option value=${x.k}>${x.k}</option>`)}</select>
