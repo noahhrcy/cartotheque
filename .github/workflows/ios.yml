@@ -1,0 +1,80 @@
+name: Application iOS
+on:
+  push:
+    branches: [main]
+    paths: ["mobile/**", ".github/workflows/ios.yml"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  ipa:
+    runs-on: macos-15
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Préparer le projet iOS
+        working-directory: mobile
+        run: |
+          npm install --no-audit --no-fund
+          npx cap add ios
+          APP=ios/App/App
+          cp res-ios/AppIcon-512@2x.png "$APP/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png"
+          for f in "$APP"/Assets.xcassets/Splash.imageset/*.png; do cp res-ios/splash-2732x2732.png "$f"; done
+          PL="$APP/Info.plist"
+          plutil -replace CFBundleDisplayName -string "Cartothèque" "$PL"
+          plutil -replace NSCameraUsageDescription -string "Cartothèque utilise l'appareil photo pour scanner et identifier vos cartes." "$PL"
+          plutil -replace NSPhotoLibraryUsageDescription -string "Cartothèque ouvre uniquement les photos de cartes que vous choisissez d'importer." "$PL"
+          plutil -replace NSPhotoLibraryAddUsageDescription -string "Cartothèque enregistre les exports que vous demandez." "$PL"
+          plutil -replace ITSAppUsesNonExemptEncryption -bool NO "$PL"
+          plutil -replace UISupportedInterfaceOrientations -json '["UIInterfaceOrientationPortrait"]' "$PL"
+          # glisser depuis le bord gauche pour revenir en arrière, comme dans Safari
+          python3 - "$APP/AppDelegate.swift" <<'PY'
+          import sys
+          p = sys.argv[1]
+          s = open(p, encoding="utf-8").read()
+          hook = "func applicationDidBecomeActive(_ application: UIApplication) {"
+          assert hook in s, "applicationDidBecomeActive introuvable"
+          if "import WebKit" not in s:
+              s = s.replace("import Capacitor", "import Capacitor\nimport WebKit", 1)
+          s = s.replace(hook, hook + "\n        (window?.rootViewController as? CAPBridgeViewController)?.webView?.allowsBackForwardNavigationGestures = true", 1)
+          open(p, "w", encoding="utf-8").write(s)
+          PY
+          npx cap sync ios
+      - name: Compiler l'application (non signée)
+        working-directory: mobile/ios/App
+        run: |
+          if [ -d App.xcworkspace ]; then SRC="-workspace App.xcworkspace"; else SRC="-project App.xcodeproj"; fi
+          xcodebuild $SRC -scheme App -configuration Release -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" -quiet \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" archive
+          APPDIR="$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app"
+          test -f "$APPDIR/Info.plist"
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          cp -R "$APPDIR" "$RUNNER_TEMP/ipa/Payload/"
+          (cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/Cartotheque-beta.ipa" Payload)
+          ls -l "$GITHUB_WORKSPACE/Cartotheque-beta.ipa"
+      - name: Publier la version bêta
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<'EOF'
+          Version de test pour iPhone et iPad (iOS 14 ou plus récent). L'application charge toujours la dernière version du site : inutile de la réinstaller à chaque mise à jour.
+
+          **Le plus simple, sans ordinateur ni compte Apple :** ouvrez https://noahhrcy.github.io/cartotheque/ dans Safari, touchez le bouton Partager puis « Sur l'écran d'accueil ». Cartothèque s'ouvre alors en plein écran, comme une application, avec le scanner.
+
+          **Pour installer ce fichier .ipa :** Apple n'autorise l'installation directe qu'avec une signature. Sans abonnement développeur (99 $/an, nécessaire pour TestFlight et l'App Store), il faut passer par un ordinateur :
+          1. Sur le PC, installez Sideloadly (sideloadly.io) et iTunes, puis branchez l'iPhone en USB.
+          2. Glissez Cartotheque-beta.ipa dans Sideloadly, saisissez votre identifiant Apple et lancez l'installation.
+          3. Sur l'iPhone : Réglages > Général > VPN et gestion de l'appareil > faites confiance à votre identifiant. Sur iOS 16 et plus, activez aussi Réglages > Confidentialité et sécurité > Mode développeur.
+
+          Avec un identifiant Apple gratuit, la signature expire au bout de 7 jours : relancez Sideloadly pour la renouveler.
+          EOF
+          gh release delete ios-beta --yes --cleanup-tag || true
+          gh release create ios-beta Cartotheque-beta.ipa --target "${GITHUB_SHA}" --prerelease \
+            --title "Cartothèque — bêta iOS" --notes-file notes.md

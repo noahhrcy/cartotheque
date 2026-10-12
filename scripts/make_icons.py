@@ -1,7 +1,7 @@
 """Draw the Cartothèque icon (a card on an ink background) as PNGs, with no third-party library.
 
 usage: python make_icons.py <repo_root>
-Writes public/icons/*.png (PWA) and mobile/res/** + mobile/splash.png (Android).
+Writes public/icons/*.png (PWA), mobile/res/** + mobile/splash.png (Android) and mobile/res-ios/* (iOS).
 """
 import math, os, struct, sys, zlib
 
@@ -12,17 +12,20 @@ COBALT = (0x34, 0x46, 0xE6)
 SPLASH_BG = (0x0D, 0x10, 0x15)
 
 
-def png(path, w, h, rgba):
+def png(path, w, h, rgba, opaque=False):
+    """opaque: drop the alpha channel (iOS app icons must not have one)."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    if opaque:
+        rgba = bytes(b for i, b in enumerate(rgba) if i % 4 != 3)
     raw = bytearray()
-    stride = w * 4
+    stride = w * (3 if opaque else 4)
     for y in range(h):
         raw.append(0)
         raw += rgba[y * stride:(y + 1) * stride]
     def chunk(t, d):
         c = struct.pack(">I", len(d)) + t + d
         return c + struct.pack(">I", zlib.crc32(t + d) & 0xFFFFFFFF)
-    data = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(bytes(raw), 9)) + chunk(b"IEND", b"")
+    data = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2 if opaque else 6, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(bytes(raw), 9)) + chunk(b"IEND", b"")
     with open(path, "wb") as f:
         f.write(data)
 
@@ -48,12 +51,18 @@ def draw(w, h, bg, shape="square", scale=1.0, cx=None, cy=None, transparent=Fals
     line_h = 0.028 * n * scale
     l1 = (cx - cw + inset + 0.13 * n * scale, win_top + win_h + 0.06 * n * scale, 0.13 * n * scale, line_h / 2, line_h / 2)
     l2 = (cx - cw + inset + 0.075 * n * scale, l1[1] + 0.055 * n * scale, 0.075 * n * scale, line_h / 2, line_h / 2)
-    buf = bytearray(w * h * 4)
     x0, x1 = int(max(0, cx - cw - 2)), int(min(w, cx + cw + 2))
     y0, y1 = int(max(0, cy - ch - 2)), int(min(h, cy + ch + 2))
-    for y in range(h):
+    if shape == "square":
+        # flat background: fill it at once and only shade the card's bounding box (big splash screens)
+        buf = bytearray(bytes((*bg, 255)) * (w * h))
+        ys, xs = range(y0, y1), range(x0, x1)
+    else:
+        buf = bytearray(w * h * 4)
+        ys, xs = range(h), range(w)
+    for y in ys:
         py = y + 0.5
-        for x in range(w):
+        for x in xs:
             px = x + 0.5
             # background coverage
             if shape == "square":
@@ -105,4 +114,8 @@ for dens, px in (("mdpi", 48), ("hdpi", 72), ("xhdpi", 96), ("xxhdpi", 144), ("x
     fg = round(px * 108 / 48)
     png(os.path.join(res, f"mipmap-{dens}", "ic_launcher_foreground.png"), fg, fg, draw(fg, fg, INK, "none", scale=0.62))
 png(os.path.join(ROOT, "mobile", "splash.png"), 960, 1600, draw(960, 1600, SPLASH_BG, "square", scale=0.55))
+
+ios = os.path.join(ROOT, "mobile", "res-ios")
+png(os.path.join(ios, "AppIcon-512@2x.png"), 1024, 1024, draw(1024, 1024, INK, "square"), opaque=True)
+png(os.path.join(ios, "splash-2732x2732.png"), 2732, 2732, draw(2732, 2732, SPLASH_BG, "square", scale=0.3), opaque=True)
 print("icons written")
