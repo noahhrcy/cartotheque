@@ -145,10 +145,13 @@ language plpgsql security definer set search_path = '' as $$
 declare
   recent int;
   young boolean;
+  max_per_day int;
 begin
   select count(*) into recent from public.trades where a = new.a and created_at > now() - interval '24 hours';
   select created_at > now() - interval '7 days' into young from public.profiles where id = new.a;
-  if recent >= case when young then 8 else 40 end then
+  -- PL/pgSQL coupe une condition « if » au premier « then » : la limite est calculée à part
+  max_per_day := case when young then 8 else 40 end;
+  if recent >= max_per_day then
     raise exception 'too many proposals today' using errcode = '54000';
   end if;
   return new;
