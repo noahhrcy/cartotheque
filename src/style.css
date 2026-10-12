@@ -1,3 +1,4 @@
+/* Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE). */
 /* Layout: app shell — sticky header (desktop nav) + bottom tab bar on phones; content column max 1180px.
    Motifs: card tiles framed by energy type, binder pockets, price shown as a grading-slab label. */
 :root {

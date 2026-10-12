@@ -1,3 +1,4 @@
+/* Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE). */
 /* ============================================================
    Cartothèque — shell, home, catalogue, sets, card page
    ============================================================ */

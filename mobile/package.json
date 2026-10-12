@@ -12,5 +12,7 @@
     "@capacitor/haptics": "^7.0.0",
     "@capacitor/ios": "^7.0.0",
     "@capacitor/share": "^7.0.0"
-  }
+  },
+  "author": "Noah Henricy, Yoni Safran, Tibo Amettler",
+  "license": "UNLICENSED"
 }

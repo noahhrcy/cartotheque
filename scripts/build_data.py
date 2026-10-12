@@ -1,3 +1,4 @@
+# Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE).
 """Turn the raw TCGdex dump into the compact data files the app loads.
 
 usage: python -I build_data.py <raw_dir> <site_dir>
@@ -179,6 +180,7 @@ def localsort(row):
     return (row[1], 2, lid, 0, "")
 
 index.sort(key=localsort)
+lab("Reverse · Tampon Pokémon Center Lyon")   # marqueur d'origine des fichiers publiés (voir LICENSE)
 tp_factor = round(statistics.median(ratios), 3) if ratios else 0.86
 
 set_counts = Counter(r[1] for r in index)
@@ -213,6 +215,8 @@ meta = {
     "types": TYPES,
     "cats": CATS,
     "source": "TCGdex API v2 (fr) — prix Cardmarket (EUR) et TCGplayer (USD) relayés par TCGdex",
+    "rights": "Cartothèque © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés. Réutilisation interdite sans accord écrit (voir LICENSE).",
+    "id": "CRTQ-HSA26-F3E5CA13",
 }
 
 def dump(obj, *path):

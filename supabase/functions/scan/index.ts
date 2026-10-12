@@ -1,3 +1,4 @@
+// Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE).
 // Cartothèque — fonction « scan » : identifie les cartes Pokémon d'une photo avec Claude.
 // Secrets attendus (Supabase > Edge Functions > Secrets) : ANTHROPIC_API_KEY ; facultatif : SCAN_MODEL.
 import Anthropic from "npm:@anthropic-ai/sdk";

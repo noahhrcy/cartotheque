@@ -1,3 +1,4 @@
+# Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE).
 """Append today's Cardmarket trend (main variant of each card) to public/data/history/<set>.json.
 
 usage: python update_history.py <public_dir>

@@ -1,3 +1,4 @@
+# Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE).
 """Download the full French TCGdex catalogue (sets + every card detail with pricing) into JSONL files."""
 import json, sys, os, time, threading
 import urllib.request, urllib.error

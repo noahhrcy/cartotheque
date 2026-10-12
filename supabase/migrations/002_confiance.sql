@@ -1,3 +1,4 @@
+-- Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE).
 -- ============================================================
 -- Cartothèque — confiance et lutte contre la fraude (à exécuter une fois, après schema.sql)
 -- Supabase : SQL Editor > New query > coller ce fichier > Run.

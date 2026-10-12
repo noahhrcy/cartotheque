@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE).
 # Builds the iOS shell for the simulator, runs it on a simulated iPhone and saves screenshots (app + Safari) in $1.
 # usage (from mobile/, after prepare-ios.sh): bash ios-simulator.sh <screenshots dir>
 set -euo pipefail

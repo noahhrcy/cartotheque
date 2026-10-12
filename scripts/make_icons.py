@@ -1,3 +1,4 @@
+# Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE).
 """Draw the Cartothèque icon (a card on an ink background) as PNGs, with no third-party library.
 
 usage: python make_icons.py <repo_root>

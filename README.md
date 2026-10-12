@@ -1,5 +1,7 @@
 # Cartothèque
 
+© 2026 Noah Henricy, Yoni Safran et Tibo Amettler. **Tous droits réservés** : ce dépôt est public pour être consulté, pas réutilisé. Voir [LICENSE](LICENSE).
+
 Plateforme de collection Pokémon TCG : catalogue français complet (20 029 cartes), cote expliquée, scanner photo, classeurs virtuels, wishlist, échanges entre membres.
 
 | Où | Quoi |
@@ -50,3 +52,7 @@ python scripts/make_icons.py .                      # icônes web, Android et iO
 - Les visuels de cartes proviennent de TCGdex et restent la propriété de The Pokémon Company : licence à obtenir avant toute commercialisation.
 - Les prix Cardmarket/TCGplayer sont relayés par TCGdex : contrat de données à négocier avant lancement commercial.
 - Pas de récupération de mot de passe par e-mail tant qu'un service d'envoi (SMTP) n'est pas branché dans Supabase.
+
+## Droits
+
+Cartothèque est conçu par Noah Henricy, Yoni Safran et Tibo Amettler. Le code, l'interface et les fichiers de données produits par le projet (catalogue, cotes, historique des prix, index visuel) ne sont pas sous licence libre : toute reproduction, modification, redistribution ou réutilisation, même partielle, demande l'accord écrit des auteurs ([LICENSE](LICENSE)). Les données d'origine (TCGdex, Cardmarket, TCGplayer) et l'univers Pokémon restent la propriété de leurs détenteurs respectifs.

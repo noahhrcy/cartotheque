@@ -1,0 +1,37 @@
+Cartothèque
+Copyright © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés.
+
+Ce dépôt est public uniquement pour permettre sa consultation. Il n'est PAS
+distribué sous une licence libre (« open source ») : aucun droit d'utilisation
+n'est accordé en dehors de ceux listés ci-dessous.
+
+Sauf autorisation écrite et préalable des titulaires des droits, il est interdit de :
+  - reproduire, copier, télécharger pour réutilisation ou héberger tout ou partie du
+    code source, de l'interface, des textes, ou des fichiers de données produits par
+    le projet (catalogue, cotes, historique des prix, index visuel du scanner) ;
+  - modifier, adapter, traduire ou créer une œuvre dérivée de tout ou partie du projet ;
+  - distribuer, publier, vendre, louer ou mettre à disposition le projet ou une version
+    modifiée, à titre gratuit ou onéreux ;
+  - extraire ou réutiliser une partie substantielle des bases de données du projet ;
+  - utiliser le nom « Cartothèque », son logo ou son identité visuelle pour un produit
+    ou un service.
+
+Les conditions d'utilisation de GitHub permettent aux utilisateurs de GitHub de
+consulter ce dépôt et d'en créer une copie (« fork ») sur GitHub. Elles ne
+confèrent aucun autre droit, notamment aucun droit d'exécuter, de déployer ou de
+réutiliser le projet hors de GitHub.
+
+Les fichiers de données publiés par le projet contiennent des marqueurs qui
+permettent d'en identifier l'origine.
+
+Éléments tiers, soumis à leurs propres licences ou droits et non couverts par la
+présente :
+  - bibliothèques Preact, htm, supabase-js, Tesseract.js et Capacitor : licences de
+    leurs auteurs respectifs ;
+  - données de catalogue et de prix : TCGdex, qui relaie Cardmarket et TCGplayer ;
+  - Pokémon, les noms, illustrations et visuels des cartes : © The Pokémon Company,
+    Nintendo, Creatures Inc. et GAME FREAK inc. Cartothèque est un projet
+    indépendant, ni affilié ni approuvé par ces sociétés.
+
+Pour toute demande d'autorisation, contactez les titulaires des droits par
+l'intermédiaire du compte GitHub noahhrcy.

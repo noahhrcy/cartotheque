@@ -1,3 +1,4 @@
+# Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE).
 """Assemble the app from src/.
 
 usage:
@@ -22,7 +23,8 @@ js = "\n".join(read(f) for f in modules)
 css = read("style.css")
 
 if TARGET == "artifact":
-    page = f"""<title>Cartothèque</title>
+    page = f"""<!-- Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE). -->
+<title>Cartothèque</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="{FONTS}">
@@ -50,9 +52,12 @@ img{max-width:100%}
 [hidden]{display:none!important}
 """
 page = f"""<!doctype html>
+<!-- Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE). -->
 <html lang="fr">
 <head>
 <meta charset="utf-8">
+<meta name="author" content="Noah Henricy, Yoni Safran, Tibo Amettler">
+<meta name="copyright" content="© 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés.">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Cartothèque</title>
 <meta name="description" content="Collection, cote et échanges de cartes Pokémon : catalogue français complet, scanner, classeurs virtuels.">
@@ -117,7 +122,8 @@ manifest = {
 }
 open(os.path.join(OUT, "manifest.webmanifest"), "w", encoding="utf-8").write(json.dumps(manifest, ensure_ascii=False, indent=2))
 
-sw = """// Cartothèque service worker — app shell cached, data refreshed in the background, API calls never cached.
+sw = """// Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE).
+// Cartothèque service worker — app shell cached, data refreshed in the background, API calls never cached.
 const VERSION = '__VERSION__';
 const SHELL = 'shell-' + VERSION;
 const DATA = 'data-v1';

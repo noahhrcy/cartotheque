@@ -1,3 +1,4 @@
+# Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE).
 """Build the visual index used by the free on-device scanner.
 
 usage: python build_visual_index.py <public_dir> <image_cache_dir>
@@ -159,6 +160,7 @@ with open(bin_path, "wb") as f:
         rec = fresh.get(cid) or known[cid]
         assert len(rec) == RECORD
         f.write(rec)
+    f.write(b"CRTQ" + "CRTQ-HSA26-F3E5CA13 · Cartothèque © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés.".encode("utf-8"))   # signature after the records (ignored by the reader)
 with open(ids_path, "w", encoding="utf-8") as f:
     json.dump(order, f, separators=(",", ":"))
 print(f"visual index: {len(order)} cards ({len(fresh)} new, {failed} failed), {os.path.getsize(bin_path)} bytes, {time.time() - t0:.0f} s")

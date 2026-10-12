@@ -1,8 +1,11 @@
+/* Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE). */
 'use strict';
 /* ============================================================
    Cartothèque — core: utils, catalogue, price engine, search, scan matching
    ============================================================ */
 const { html, render, useState, useEffect, useMemo, useRef } = htmPreact;
+const RIGHTS = '© 2026 Noah Henricy, Yoni Safran et Tibo Amettler';
+const CARTO_SIG = 'CRTQ-HSA26-F3E5CA13';   // identifiant du projet, repris dans les fichiers de données publiés
 
 // ---------- utils ----------
 const NF2 = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });

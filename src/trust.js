@@ -1,3 +1,4 @@
+/* Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE). */
 /* ============================================================
    Cartothèque — trust and fraud prevention
    reputation badges, price sanity, risky-message warnings, safety guidance, proof photos

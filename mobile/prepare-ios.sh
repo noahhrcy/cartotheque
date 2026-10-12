@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE).
 # Generates the Xcode project of the iOS shell (Capacitor) with the Cartothèque icon, splash, permissions and swipe-back gesture.
 # usage (from mobile/): bash prepare-ios.sh [start URL]   — the optional URL replaces server.url (simulator tests)
 set -euo pipefail
@@ -22,6 +23,7 @@ plutil -replace NSCameraUsageDescription -string "Cartothèque utilise l'apparei
 plutil -replace NSPhotoLibraryUsageDescription -string "Cartothèque ouvre uniquement les photos de cartes que vous choisissez d'importer." "$PL"
 plutil -replace NSPhotoLibraryAddUsageDescription -string "Cartothèque enregistre les exports que vous demandez." "$PL"
 plutil -replace ITSAppUsesNonExemptEncryption -bool NO "$PL"
+plutil -replace NSHumanReadableCopyright -string "© 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés." "$PL"
 plutil -replace UISupportedInterfaceOrientations -json '["UIInterfaceOrientationPortrait"]' "$PL"
 # swipe from the left edge to go back, as in Safari
 python3 - "$APP/AppDelegate.swift" <<'PY'

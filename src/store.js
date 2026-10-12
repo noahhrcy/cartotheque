@@ -1,3 +1,4 @@
+/* Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE). */
 /* ============================================================
    Cartothèque — state, persistence (through the platform adapter PF, or local fallback), community sync
    ============================================================ */

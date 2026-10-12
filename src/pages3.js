@@ -1,3 +1,4 @@
+/* Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE). */
 /* ============================================================
    Cartothèque — market, trades, profiles, admin, about, app
    ============================================================ */
@@ -416,7 +417,7 @@ function AboutPage() {
       <div class="panel stack s"><h3>Données et sources</h3><p class="small">Catalogue : TCGdex (base ouverte, version française). Prix : indicateurs Cardmarket (EUR) et TCGplayer (USD, ramené au marché européen × ${String(CAT.meta.tpFactor).replace('.', ',')}), relayés par TCGdex. Instantané du ${fmtDate(CAT.meta.snapshot)}.</p><p class="small muted">Avant toute commercialisation : licence de données avec Cardmarket, eBay ou un agrégateur (droits de stockage, d'affichage, de recalcul et d'historique).</p></div>
       <div class="panel stack s"><h3>Confidentialité</h3><p class="small">Votre collection, vos prix d'achat et vos scellés sont privés. Seuls les éléments que vous rendez publics (wishlist, cartes à l'échange ou à vendre, classeurs choisis) sont visibles des membres. Aucune localisation précise n'est collectée. Les photos du scanner ne sont pas conservées.</p></div>
     </section>
-    <p class="small muted" style="max-width:80ch">Cartothèque est un projet indépendant, non affilié à Nintendo, The Pokémon Company, Creatures ou GAME FREAK. Pokémon et les noms de cartes sont des marques de leurs détenteurs respectifs. Les visuels de cartes affichés ici sont des fiches générées ; les illustrations officielles s'ouvrent via le lien « Image officielle ».</p>
+    <p class="small muted" style="max-width:80ch">Cartothèque est conçu par Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés : le code, l'interface et les données du projet ne peuvent être réutilisés sans leur accord écrit. C'est un projet indépendant, non affilié à Nintendo, The Pokémon Company, Creatures ou GAME FREAK. Pokémon et les noms de cartes sont des marques de leurs détenteurs respectifs. Les illustrations des cartes proviennent de TCGdex et restent la propriété de leurs détenteurs ; quand une illustration manque, une fiche est générée à sa place.</p>
   </div>`;
 }
 
@@ -431,7 +432,7 @@ function App() {
     <${TopBar} />
     ${S.config.banner ? html`<div class="notice" style="border-radius:0;text-align:center">${S.config.banner}</div>` : null}
     <main id="main" class=${S.navDir === 'back' ? 'nav-back' : ''}><${P} key=${S.route.name + ':' + JSON.stringify(S.route.params)} ...${S.route.params} /></main>
-    <footer style="max-width:1180px;margin:0 auto;padding:0 16px 120px;width:100%"><p class="tiny muted">Cartothèque · projet indépendant, non affilié à The Pokémon Company · prix au ${fmtDate(CAT.meta.snapshot)} (Cardmarket, TCGplayer via TCGdex) · <button class="btn ghost sm" style="padding:2px 6px" onClick=${() => go('about')}>À propos et feuille de route</button></p></footer>
+    <footer style="max-width:1180px;margin:0 auto;padding:0 16px 120px;width:100%"><p class="tiny muted">Cartothèque ${RIGHTS} · tous droits réservés · projet indépendant, non affilié à The Pokémon Company · prix au ${fmtDate(CAT.meta.snapshot)} (Cardmarket, TCGplayer via TCGdex) · <button class="btn ghost sm" style="padding:2px 6px" onClick=${() => go('about')}>À propos et feuille de route</button></p></footer>
     <${TabBar} />
     ${S.toast ? html`<div class="toast" role="status" key=${S.toast}>${S.toast}</div>` : null}
     <${ModalHost} />
@@ -450,4 +451,5 @@ function App() {
   const r0 = routeFromHash(location.hash);
   if (r0 && !(r0.params.id && r0.name === 'card' && !CAT.byId.has(r0.params.id))) { S.route = r0; emit(); }
   if (!S.catError) initPlatform().catch(e => { console.warn('platform', e); startLocal(); });
+  try { console.info(`%cCartothèque%c ${RIGHTS} · tous droits réservés · ${CARTO_SIG}`, 'font-weight:700', ''); } catch (e) { /* no console */ }
 })();

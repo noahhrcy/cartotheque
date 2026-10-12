@@ -1,3 +1,4 @@
+/* Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE). */
 /* ============================================================
    Cartothèque — platform adapter: Claude artifact (db, user, sample, downloads capabilities)
    ============================================================ */

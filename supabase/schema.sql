@@ -1,3 +1,4 @@
+-- Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE).
 -- ============================================================
 -- Cartothèque — base de données de test (Supabase / PostgreSQL)
 -- À coller une seule fois dans Supabase : SQL Editor > New query > Run.

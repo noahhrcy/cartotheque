@@ -1,3 +1,4 @@
+/* Cartothèque — © 2026 Noah Henricy, Yoni Safran et Tibo Amettler. Tous droits réservés (voir LICENSE). */
 /* ============================================================
    Cartothèque — free on-device scanner
    1. artwork recognition: the same descriptors as scripts/build_visual_index.py, compared with the
