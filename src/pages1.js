@@ -57,7 +57,9 @@ function HomePage() {
   const [q, setQ] = useState('');
   const movers = useMemo(() => CAT.cards.filter(c => c.p >= 3 && c.conf >= 75 && c.d7 != null && c.d7 <= 1 && c.v[c.mv].cm.a1 > 0 && c.v[c.mv].cm.a7 > 0).sort((a, b) => b.d7 - a.d7).slice(0, 7), []);
   const latest = CAT.latestSets.slice(0, 5);
-  const top = useMemo(() => [...CAT.latestSets[0].cards].sort((a, b) => b.p - a.p).slice(0, 12), []);
+  // newest extension that already has market prices (a brand-new set has none for a few days)
+  const topSet = useMemo(() => CAT.latestSets.find(s => s.cards.filter(c => c.p > 0).length >= 10) || CAT.latestSets[0], []);
+  const top = useMemo(() => [...topSet.cards].filter(c => c.p > 0).sort((a, b) => b.p - a.p).slice(0, 12), []);
   const recent = lsGet('recent', []).map(id => CAT.byId.get(id)).filter(Boolean).slice(0, 12);
   const wishAvail = Object.keys(wishItems()).filter(id => availability(id) > 0).length;
   const snap = fmtDate(CAT.meta.snapshot);
@@ -96,7 +98,11 @@ function HomePage() {
       </div>
     </section>
 
-    ${!st.cards && S.privLoaded ? html`<${Empty} title="Votre classeur est encore vide" action=${html`<div class="row" style="justify-content:center"><button class="btn primary" onClick=${() => go('scan')}><${Icon} n="scan" />Scanner ma première carte</button><button class="btn" onClick=${() => go('sets')}>Parcourir les extensions</button></div>`}>Scannez une carte ou ajoutez-la depuis le catalogue : sa cote s'affiche, vous choisissez l'état et la quantité, et la valeur de votre collection se met à jour.<//>` : null}
+    ${!st.cards && S.privLoaded ? html`<section class="stack s"><h2>Comment ça marche</h2><div class="steps-guide">
+      <button class="step" onClick=${() => go('scan')}><span class="n">1</span><span><b>Scannez ou cherchez une carte</b><span class="small muted">Sa cote s'affiche aussitôt, expliquée source par source. Le scanner est gratuit et illimité.</span></span></button>
+      <button class="step" onClick=${() => go('sets')}><span class="n">2</span><span><b>Rangez votre collection</b><span class="small muted">État, langue, quantité, classeurs virtuels et recherches : la valeur totale se met à jour chaque jour.</span></span></button>
+      <button class="step" onClick=${() => go('market')}><span class="n">3</span><span><b>Échangez en confiance</b><span class="small muted">Membres notés, photos réelles obligatoires au-delà de 30 €, réception confirmée des deux côtés.</span></span></button>
+    </div></section>` : null}
 
     <section class="grid-2">
       <div class="panel">
@@ -110,7 +116,7 @@ function HomePage() {
     </section>
 
     <section>
-      <div class="section-h"><h2>Les plus cotées · ${CAT.latestSets[0].n}</h2><button class="btn ghost sm" onClick=${() => go('set', { id: CAT.latestSets[0].id })}>Voir l'extension</button></div>
+      <div class="section-h"><h2>Les plus cotées · ${topSet.n}</h2><button class="btn ghost sm" onClick=${() => go('set', { id: topSet.id })}>Voir l'extension</button></div>
       <div class="hscroll">${top.map(c => html`<${CardCell} c=${c} />`)}</div>
     </section>
 
@@ -317,11 +323,12 @@ function CardPage({ id }) {
     <div class="card-page">
       <div class="stack card-visual">
         <div class="tile-wrap"><${CardTile} c=${c} vi=${vi} hq=${true} /></div>
+        <div class="mobile-only price-line"><span class="num">${est.value ? fmtEUR(est.value, false) : 'Cote indisponible'}</span>${est.value ? html`<span class="small"><span class="conf-dot" style=${`background:${confColor(est.conf)}`}></span>confiance ${est.conf} %</span>` : null}</div>
         <div class="action-grid">
-          <button class="action" onClick=${() => openModal('add', { id, vi })}><span class="ic" style="background:var(--st-own)">+</span>${st.own ? `Possédée ×${st.own}` : 'Ajouter à ma collection'}</button>
-          <button class=${'action' + (st.want ? ' on' : '')} style=${st.want ? 'color:var(--st-want)' : ''} onClick=${() => { toggleWish(id); toast(st.want ? 'Retirée de vos recherches' : 'Ajoutée à vos recherches'); }}><span class="ic" style="background:var(--st-want)">♥</span>${st.want ? 'Recherchée' : 'Je la recherche'}</button>
-          <button class=${'action' + (st.trade ? ' on' : '')} style=${st.trade ? 'color:var(--st-trade)' : ''} onClick=${needOwn(() => openModal('copies', { id, mode: 'trade' }))}><span class="ic" style="background:var(--st-trade)">⇄</span>${st.trade ? `${st.trade} à l'échange` : st.own > 1 ? 'Échanger un double' : "Je l'échange"}</button>
-          <button class=${'action' + (st.sell ? ' on' : '')} style=${st.sell ? 'color:var(--st-sell)' : ''} onClick=${needOwn(() => openModal('copies', { id, mode: 'sell' }))}><span class="ic" style="background:var(--st-sell)">€</span>${st.sell ? `${st.sell} en vente` : 'Je la vends'}</button>
+          <button class="action" onClick=${() => openModal('add', { id, vi })}><span class="ic" style="background:var(--st-own)">+</span>${st.own ? `Possédée ×${st.own}` : 'Ajouter'}</button>
+          <button class=${'action' + (st.want ? ' on' : '')} style=${st.want ? 'color:var(--st-want)' : ''} onClick=${() => { toggleWish(id); toast(st.want ? 'Retirée de vos recherches' : 'Ajoutée à vos recherches'); }}><span class="ic" style="background:var(--st-want)">♥</span>${st.want ? 'Recherchée' : 'Rechercher'}</button>
+          <button class=${'action' + (st.trade ? ' on' : '')} style=${st.trade ? 'color:var(--st-trade)' : ''} onClick=${needOwn(() => openModal('copies', { id, mode: 'trade' }))}><span class="ic" style="background:var(--st-trade)">⇄</span>${st.trade ? `${st.trade} à l'échange` : 'Échanger'}</button>
+          <button class=${'action' + (st.sell ? ' on' : '')} style=${st.sell ? 'color:var(--st-sell)' : ''} onClick=${needOwn(() => openModal('copies', { id, mode: 'sell' }))}><span class="ic" style="background:var(--st-sell)">€</span>${st.sell ? `${st.sell} en vente` : 'Vendre'}</button>
         </div>
         ${st.own ? html`<button class="btn sm" onClick=${() => openModal('copies', { id })}>Gérer mes ${st.own} exemplaires</button>` : null}
         <div class="row tight" style="justify-content:center">

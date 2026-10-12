@@ -186,7 +186,7 @@ sets_out = []
 for s in set_list:
     sets_out.append({
         "id": s["id"],
-        "n": s["name"],
+        "n": re.sub(r"([a-zà-ÿ])(\d)", r"\1 \2", s["name"]),   # « Classique30ᵉ » -> « Classique 30ᵉ »
         "s": s.get("serie", {}).get("id"),
         "d": s.get("releaseDate"),
         "o": (s.get("cardCount") or {}).get("official") or 0,

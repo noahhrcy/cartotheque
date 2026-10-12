@@ -92,8 +92,8 @@ function ScanPage() {
   return html`<div class="stack l">
     <section class="scan-hero">
       <div class="stack">
-        <div class="eyebrow" style="color:color-mix(in srgb,var(--paper) 65%,transparent)">Scanner${engine === 'free' ? ' · gratuit et illimité' : ''}</div>
-        <h1 style="color:var(--paper)">Photographiez, on s'occupe du reste</h1>
+        <div class="eyebrow" style="color:color-mix(in srgb,var(--hero-fg) 65%,transparent)">Scanner${engine === 'free' ? ' · gratuit et illimité' : ''}</div>
+        <h1 style="color:var(--hero-fg)">Photographiez, on s'occupe du reste</h1>
         <p style="opacity:.8;max-width:52ch">${engine === 'free'
           ? "Cadrez une carte dans le viseur : son illustration est comparée aux 17 000 cartes du catalogue et son numéro imprimé est lu, directement sur votre appareil. Rien n'est envoyé, rien n'est facturé."
           : 'Une carte, plusieurs cartes étalées ou une page de classeur entière : chaque carte est identifiée (nom, extension, numéro, variante, état apparent) puis rapprochée du catalogue avec un indice de confiance.'}</p>
@@ -105,8 +105,8 @@ function ScanPage() {
           <input ref=${lib} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange=${pick} />
         </div>
         <div class="row small" style="opacity:.85">
-          ${PF.freeScan && canAI ? html`<label class="switch" style="color:var(--paper)"><input id="scan-ai" type="checkbox" checked=${engine === 'ai'} onChange=${e => { SCAN.engine = e.target.checked ? 'ai' : 'free'; emit(); }} />Lecture IA (pages de classeur, cartes difficiles)</label>` : null}
-          ${engine === 'ai' ? html`<label class="switch" style="color:var(--paper)"><input id="scan-precise" type="checkbox" checked=${SCAN.tier === 'default'} onChange=${e => { SCAN.tier = e.target.checked ? 'default' : 'quick'; emit(); }} />Lecture précise (plus lente)</label><span class="num">Lectures IA ce mois-ci : ${used}${S.config.enforceQuota ? ' / ' + quota : ''}</span>` : null}
+          ${PF.freeScan && canAI ? html`<label class="switch" style="color:var(--hero-fg)"><input id="scan-ai" type="checkbox" checked=${engine === 'ai'} onChange=${e => { SCAN.engine = e.target.checked ? 'ai' : 'free'; emit(); }} />Lecture IA (pages de classeur, cartes difficiles)</label>` : null}
+          ${engine === 'ai' ? html`<label class="switch" style="color:var(--hero-fg)"><input id="scan-precise" type="checkbox" checked=${SCAN.tier === 'default'} onChange=${e => { SCAN.tier = e.target.checked ? 'default' : 'quick'; emit(); }} />Lecture précise (plus lente)</label><span class="num">Lectures IA ce mois-ci : ${used}${S.config.enforceQuota ? ' / ' + quota : ''}</span>` : null}
         </div>
         ${blocked ? html`<p class="notice warn">Vous avez utilisé vos ${quota} lectures IA ce mois-ci. Le scanner gratuit reste disponible : décochez « Lecture IA ».</p>` : null}`
         : html`<div class="notice warn stack s"><span>${S.mode === 'local' ? PF.text.scanLocal : SCAN.disabled ? (SCAN.reason || 'La reconnaissance photo est désactivée pour cette visite. Utilisez la saisie rapide ci-dessous.') : 'Connexion au module de reconnaissance…'}</span>${S.mode === 'local' && PF.LoginButton ? html`<${PF.LoginButton} />` : null}</div>`}
